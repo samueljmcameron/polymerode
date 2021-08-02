@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <set>
+#include <map>
 
 #include "input.hpp"
 
@@ -20,7 +21,7 @@ private:
   
 public:
   GlobalParams(std::ifstream&,
-	       std::map<std::string,std::string>,
+	       std::map<std::string,std::string> const &,
 	       std::string&);
 
   int molecules;
@@ -28,6 +29,8 @@ public:
   double timestep;
   int dump_every;
   std::string dump_file;
+
+
   
 };
 

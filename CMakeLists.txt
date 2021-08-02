@@ -9,7 +9,7 @@ project(poly VERSION 1.0 DESCRIPTION "Single tethered polymer dynamics"
 
 add_compile_options(-O3 -Wall -Wextra)
 
-
+message("${CMAKE_MODULE_PATH}")
 
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 

@@ -2,7 +2,7 @@
 #include "globalparams.hpp"
 
 GlobalParams::GlobalParams(std::ifstream& input,
-			   std::map<std::string,std::string> varMap,
+			   std::map<std::string,std::string> const& varMap,
 			   std::string& lastline)
 {
 
@@ -10,6 +10,7 @@ GlobalParams::GlobalParams(std::ifstream& input,
   steps = default_steps;
   timestep = default_timestep;
   dump_every = default_dump_every;
+
   std::string line;  
   if (input) {
 

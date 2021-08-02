@@ -83,6 +83,10 @@ int main(int argc, char* argv[])
 
   splitvec.erase(splitvec.begin());
 
+  for (auto &c : splitvec)
+    input::convertVariable(c,variables);
+  
+  
   Polymer pmer(splitvec);
 
   

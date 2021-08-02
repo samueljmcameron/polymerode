@@ -113,7 +113,7 @@ Polymer::Polymer(std::vector<std::string> splitvec)
   costhetas.resize(Nbeads-2);
   k_effs.resize(Nbeads-2);
 
-  std::cout << seed << std::endl;
+
   gen.seed(seed);
 
   init_atoms();
@@ -142,7 +142,7 @@ void Polymer::init_atoms()
   
   double tmp,swich;
   double dum;
-  std::cout << dist(gen) << std::endl;
+
   for (int mu = 0; mu < Nbeads-1; mu++) {
 
     if (mu > 0) {
