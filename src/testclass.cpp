@@ -5,16 +5,16 @@
 #include <stdexcept>
 
 
+typedef Eigen::Triplet<double> Triplet;
+
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-TestClass::TestClass(int Nin, double rodin, double Delta_tin, double zparain,
-		     double zperpin, double tempin,double kappain,
-		     Eigen::Vector3d x0in,  int seedin)
-  : Base(Nin,rodin, Delta_tin,zparain,zperpin, tempin,kappain, x0in ,seedin)
-
+TestClass::TestClass(std::vector<Atom> as, std::vector<Bond> bs)
 {
-
+  atoms = as;
+  bonds = bs;
+  Nbeads = atoms.size();
   
 }
 
@@ -26,116 +26,133 @@ TestClass::~TestClass()
 }
 
 
-Eigen::Matrix3d TestClass::projection(int i, int j)
+template<int HHAT>
+TestClass::SpMat TestClass::compute_matHat()
 {
+  std::vector<Triplet> coefficients;
 
+  Matrix<Eigen::Vector3d> boldn = set_boldn_matrix();
+
+
+  for (int mu = 0; mu < Nbeads-1; mu++ ){
+    for (int rho = 0; rho < Nbeads-1; rho ++ ) {
+      double sum = 0;
+      for (int i = 0; i < Nbeads; i++) {
+	if (HHAT) {
+	  sum += boldn(i,mu).dot(atoms[i].friction*boldn(i,rho));
+	} else {
+	  sum += boldn(i,mu).dot(boldn(i,rho));
+	}
+	
+      }
+
+      coefficients.push_back(Triplet(mu,rho,sum));
+    }
+  }
   
-  solver.factorize(Gmunu);
+  SpMat mat(Nbeads-1,Nbeads-1);
+  
+  mat.setFromTriplets(coefficients.begin(),coefficients.end());
+  
+  return mat;
+}
+
+TestClass::SpMat TestClass::compute_Ghat()
+{
+  return compute_matHat<0>();
+}
+
+TestClass::SpMat TestClass::compute_Hhat()
+{
+  return compute_matHat<1>();
+}
+
+Eigen::MatrixXd TestClass::invert_matrix(TestClass::SpMat& mat)
+{
+  solver.analyzePattern(mat);
+  solver.factorize(mat);
 
   SpMat Identity(Nbeads-1,Nbeads-1);
   Identity.setIdentity();
 
-  Eigen::MatrixXd Ginv = solver.solve(Identity);
-
-
-  Eigen::VectorXd nx_i = compute_boldn_x(i);
-  Eigen::VectorXd nx_j = compute_boldn_x(j);
-
-  Eigen::VectorXd ny_i = compute_boldn_y(i);
-  Eigen::VectorXd ny_j = compute_boldn_y(j);
-
-  Eigen::VectorXd nz_i = compute_boldn_z(i);
-  Eigen::VectorXd nz_j = compute_boldn_z(j);
-  
-
-  Eigen::Matrix3d ptemp;
-
-  ptemp.setZero();
-
-  if (i == j) {
-    ptemp(0,0) = ptemp(1,1) = ptemp(2,2) = 1.0;
-  }
-  
-  ptemp(0,0) -= nx_i.dot(Ginv*nx_j);
-  ptemp(0,1) -= nx_i.dot(Ginv*ny_j);
-  ptemp(0,2) -= nx_i.dot(Ginv*nz_j);
-
-  ptemp(1,0) -= ny_i.dot(Ginv*nx_j);
-  ptemp(1,1) -= ny_i.dot(Ginv*ny_j);
-  ptemp(1,2) -= ny_i.dot(Ginv*nz_j);
-
-  ptemp(2,0) -= nz_i.dot(Ginv*nx_j);
-  ptemp(2,1) -= nz_i.dot(Ginv*ny_j);
-  ptemp(2,2) -= nz_i.dot(Ginv*nz_j);
-  
-  
-  return ptemp;
-  
+  return solver.solve(Identity);
 
 }
 
-Eigen::VectorXd TestClass::compute_boldn_x(int i)
+
+Matrix <Eigen::Matrix3d> TestClass::geo_projection(Eigen::MatrixXd& inverse,
+						   Matrix<Eigen::Vector3d>& boldn)
+{
+  return projection<0>(inverse,boldn);
+}
+
+Matrix <Eigen::Matrix3d> TestClass::dyn_projection(Eigen::MatrixXd& inverse,
+						   Matrix<Eigen::Vector3d>& boldn)
+{
+  return projection<1>(inverse,boldn);
+}
+
+template<int DYNAMIC>
+Matrix<Eigen::Matrix3d> TestClass::projection(Eigen::MatrixXd& inverse,
+					      Matrix<Eigen::Vector3d>& boldn)
+
 {
 
+  Matrix<Eigen::Matrix3d> mat(Nbeads,Nbeads);
+  for (int i = 0; i < Nbeads; i++ ) {
+    for (int j = 0; j < Nbeads; j++) {
+      
 
-  Eigen::VectorXd bmn(Nbeads-1);
+      Eigen::Matrix3d ptemp;
 
-  bmn.setZero();
-
-
-  if (i > 0) {
-    bmn(i-1) = u_x(i-1);
-  }
-  if (i < Nbeads-1) {
-    bmn(i) = -u_x(i);
-  }
-
-  return bmn;
+      ptemp.setZero();
   
+      if (i == j) {
+	ptemp.setIdentity();
+      }
+
+
+      
+      for (int mu = 0; mu < Nbeads -1 ; mu++) {
+	for (int rho = 0; rho < Nbeads -1 ; rho ++) {
+
+	  if (DYNAMIC) {
+	    
+	    ptemp += -inverse(mu,rho)*atoms[i].friction*boldn(i,mu)*boldn(j,rho).transpose();
+	    
+	  } else {
+	    ptemp += -inverse(mu,rho)*boldn(i,mu)*boldn(j,rho).transpose();
+	  }
+      
+	  
+	}
+      }
+
+      mat(i,j) = ptemp;
+      
+    }
+  }
+  
+  return mat;
 
 }
 
 
-
-Eigen::VectorXd TestClass::compute_boldn_y(int i)
+Matrix<Eigen::Vector3d> TestClass::set_boldn_matrix()
 {
-
-
-  Eigen::VectorXd bmn(Nbeads-1);
-
-  bmn.setZero();
-
-
-  if (i > 0) {
-    bmn(i-1) = u_y(i-1);
-  }
-  if (i < Nbeads-1) {
-    bmn(i) = -u_y(i);
-  }
-
-  return bmn;
+  Matrix<Eigen::Vector3d> boldn(Nbeads, Nbeads-1);
   
-
-}
-
-Eigen::VectorXd TestClass::compute_boldn_z(int i)
-{
-
-
-  Eigen::VectorXd bmn(Nbeads-1);
-
-  bmn.setZero();
-
-
-  if (i > 0) {
-    bmn(i-1) = u_z(i-1);
+  for (int i = 0; i < Nbeads; i++) {
+    for (int mu = 0; mu < Nbeads-1; mu++) {
+      if (i == mu) {
+	boldn(i,mu) = -1*bonds[mu].rod;
+      } else if (i == mu+1) {
+	boldn(i,mu) = bonds[mu].rod;
+      } else {
+	boldn(i,mu).setZero();
+      }
+    }
   }
-  if (i < Nbeads-1) {
-    bmn(i) = -u_z(i);
-  }
-
-  return bmn;
-  
-
+  return boldn;
+      
 }
-

@@ -1,78 +1,14 @@
+#include "runtests.hpp"
 
-#include "polymer.hpp"
 #include "testclass.hpp"
-#include "matrix.hpp"
-#include "input.hpp"
-#include <Eigen/SparseLU>
 
-#include <iostream>
-#include <fstream>
-#include <string>
 
-#include <chrono>
-
-int main(int argc, char* argv[])
+void test_noise(GlobalParams &gp, Polymer &pmer)
 {
 
-  std::ifstream infile;
 
-  double dt = 0.0;
-  
-
-  int iarg = 1;  
-  while(iarg < argc) {
-    if (strcmp(argv[iarg],"-in") == 0) {
-      if (iarg+1 == argc) {
-	std::cerr << "Error: input flag '-in' specified, but no file given."
-		  << std::endl;
-	return EXIT_FAILURE;
-      }
-      infile.open(argv[iarg+1]);
-      iarg += 2;
-      
-    } else if (strcmp(argv[iarg],"-var") == 0) {
-      
-      if (iarg + 2 >= argc) {
-	std::cerr << "Error: invalid command line variable specification."
-		  << std::endl;
-	return EXIT_FAILURE;
-      }
-      variables[argv[iarg+1]] = argv[iarg+2];
-      iarg += 3;
-    } else {
-      std::cerr << "Error: invalid command line variable specification."
-		<< std::endl;
-      return EXIT_FAILURE;
-    }
-  }
-
-  if (not infile.is_open()) {
-    std::cerr < "Error: need to specify input file." << std::endl;
-    return EXIT_FAILURE;
-  }
-
-
-  std::string line;  
-
-  std::vector<std::string> splitvec;
-  
-  line = line.substr(0,line.find_first_of("#"));
-  splitvec = input::split_line(line);
-  
-
-  while ( std::getline(infile,line) &&
-	  splitvec[0] != "build_polymer")  {
-
-    std::getline(infile,line);
-    line = line.substr(0,line.find_first_of("#"));
-    splitvec = input::split_line(line);
-    
-  }
-
-  
-  splitvec.erase(splitvec.begin());
-
-  Polymer pmer(splitvec);
+  int N = pmer.get_Nbeads();
+  double dt = gp.timestep;
 
   pmer.compute_tangents_and_rods_and_friction();
 
@@ -92,7 +28,7 @@ int main(int argc, char* argv[])
   
   std::cout << "Geometrically projected noises comparison: " << std::endl;
   
-  pmer.set_unprojected_noise();
+  pmer.set_unprojected_noise(dt);
   pmer.compute_noise();
 
   Eigen::MatrixXd Ginv = test.invert_matrix(Ghat);  
@@ -169,7 +105,7 @@ int main(int argc, char* argv[])
   
   /* Compare the dynamic projection in the two cases. */
   pmer.compute_tension();
-  pmer.initial_integrate();
+  pmer.initial_integrate(dt);
 
   Eigen::MatrixXd Hinv = test.invert_matrix(Hhat);  
   projection = test.dyn_projection(Ginv,boldn);
@@ -203,7 +139,7 @@ int main(int argc, char* argv[])
 	      << pmer.atoms[i].R -Rtmps[i] << std::endl;
   }
 
-  std::cout << dt*kbT/(rodin*zperp) << std::endl;
+  std::cout << pmer.get_timescale(dt) << std::endl;
 
 
   pmer.compute_tangents_and_rods_and_friction();
@@ -217,18 +153,18 @@ int main(int argc, char* argv[])
   //  std::cout << test.compute_Hhat() << std::endl;
   pmer.compute_uc_forces();
   pmer.compute_tension();
-  pmer.final_integrate();
+  pmer.final_integrate(dt);
 
 
   std::cout << "new bond lengths final value: " << std::endl;
 
 
   for (int mu = 0; mu < N-1; mu++) {
-    std::cout << sqrt((pmer.atoms[mu+1].R-pmer.atoms[mu].R).dot(pmer.atoms[mu+1].R-pmer.atoms[mu].R))/rodin
+    std::cout << sqrt((pmer.atoms[mu+1].R-pmer.atoms[mu].R).dot(pmer.atoms[mu+1].R-pmer.atoms[mu].R))/pmer.get_bondlength()
 	      << std::endl;
   }
     
-  return 0;
+  return;
   
 }
 
