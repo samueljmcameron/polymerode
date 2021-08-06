@@ -88,6 +88,10 @@ int main(int argc, char* argv[])
   
   
   Polymer pmer(splitvec);
+  std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+
+
 
   
   if (simulation_type == "run") {
@@ -98,7 +102,10 @@ int main(int argc, char* argv[])
     test_noise(gp,pmer);
   }
 
-  
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  std::cout << "Run time = "
+	    << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
+	    << "seconds." << std::endl;  
   return 0;
   
 }
