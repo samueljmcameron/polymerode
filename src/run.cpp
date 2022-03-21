@@ -1,5 +1,6 @@
 #include "run.hpp"
 
+#include <iostream>
 #include <fstream>
 
 void run(GlobalParams& gp, Polymer& pmer)
@@ -18,6 +19,9 @@ void run(GlobalParams& gp, Polymer& pmer)
 
   pmer.compute_tangents_and_rods_and_friction();
 
+  Eigen::Vector3d startpoint(pmer.atoms[0].R);
+  Eigen::Vector3d endpoint(pmer.atoms[pmer.get_Nbeads()-1].R);
+  
   // save at time t = 0 always.
   
   if (myfile.is_open()) {
@@ -36,30 +40,35 @@ void run(GlobalParams& gp, Polymer& pmer)
     
     myfile << msave << std::endl;
   }
-  
+  int max_iters = 5;
   
   
     
   pmer.set_unprojected_noise(dt);
   pmer.set_G();
+
+  
   pmer.set_Hhat();
+
+  
   pmer.compute_noise();
   pmer.compute_uc_forces();
   pmer.compute_tension();
   pmer.initial_integrate(dt);
-    
-    
-  pmer.compute_tangents_and_rods_and_friction();
-    
-  pmer.update_Hhat();
-  pmer.compute_uc_forces();
-  pmer.compute_tension();
-  pmer.final_integrate(dt);
-    
-    
-  pmer.compute_tangents_and_rods_and_friction();
-  pmer.rescale_positions(true);
 
+  for (int iters = 0; iters < max_iters; iters ++ ) {
+  
+    pmer.compute_tangents_and_rods_and_friction();
+
+    pmer.update_Hhat();
+    pmer.compute_uc_forces();
+    pmer.compute_tension();
+    pmer.final_integrate(dt);
+    
+    
+  }
+  
+  pmer.compute_tangents_and_rods_and_friction();
 
   // save first step only if saving on every step.
   if (myfile.is_open() && dump_every == 1) {
@@ -91,18 +100,21 @@ void run(GlobalParams& gp, Polymer& pmer)
     pmer.compute_tension();
     pmer.initial_integrate(dt);
     
-    
-    pmer.compute_tangents_and_rods_and_friction();    
+
+
+
+    for (int iters = 0; iters < max_iters; iters ++ ) {
       
-    pmer.update_Hhat();
-    pmer.compute_uc_forces();
-    pmer.compute_tension();
-    
-    pmer.final_integrate(dt);
-    pmer.compute_tangents_and_rods_and_friction();
-
-
-    pmer.rescale_positions(true);
+      pmer.compute_tangents_and_rods_and_friction();
+      
+      pmer.update_Hhat();
+      pmer.compute_uc_forces();
+      pmer.compute_tension();
+      pmer.final_integrate(dt);
+      
+      
+    }
+    pmer.compute_tangents_and_rods_and_friction();  
     
     if (myfile.is_open() && i % dump_every == 0) {
 
@@ -123,8 +135,20 @@ void run(GlobalParams& gp, Polymer& pmer)
 
       
   }
-    
 
+  
+  double norm;
+  
+  std::cout << "difference in start position = " << pmer.atoms[0].R-startpoint << std::endl;
+  for (int mu = 0; mu < pmer.get_Nbeads()-1; mu++) {
+    norm = sqrt((pmer.atoms[mu+1].R-pmer.atoms[mu].R).dot(pmer.atoms[mu+1].R-pmer.atoms[mu].R));
+    
+    std::cout << "mu = " << mu << ", |u_mu|/a = " << norm/pmer.get_bondlength() << std::endl;
+  }
+  
+  std::cout << "difference in end position = "
+	    << pmer.atoms[pmer.get_Nbeads()-1].R-endpoint << std::endl;
+  
   myfile.close();
   return;
 }

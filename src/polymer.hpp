@@ -70,8 +70,9 @@ public:
   double get_bondlength();
   double get_timescale(double);
   
-  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > solver;
-  
+  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Gmunu_solver;
+  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Hhat_solver;
+  Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
 protected:
   int Nbeads;           // number of polymer beads
   double bondlength;    // length of rods connecting beads
@@ -98,13 +99,18 @@ private:
 
   double Hhat_diag_val(int);
   double Hhat_loweroff_val(int);
+
+  double Hhat_endblocks(int,int,int);
+  double Hhat_leftside(int);
+  double Hhat_bottomside(int);
   std::vector<T> init_Hhat_coeffsmatrix();
 
   Eigen::VectorXd tDets;
   Eigen::VectorXd bDets;
 
-  Eigen::VectorXd costhetas; // costhetas[i] = u[i+1].u[i]
+
   Eigen::VectorXd k_effs;
+  Eigen::VectorXd end_inverses;
 
   void compute_effective_kappa();
 
