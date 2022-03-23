@@ -105,6 +105,8 @@ Polymer::Polymer(std::vector<std::string> splitvec)
   
   tension.resize(Nbeads+5);
 
+  rhs_constraints.resize(Nbeads+5);
+  tension_change.resize(Nbeads+5);
 
   tDets.resize(Nbeads+3);
   bDets.resize(Nbeads+3);
@@ -195,7 +197,10 @@ void Polymer::init_atoms()
     atoms[mu+1].R = atoms[mu].R + bondlength*bonds[mu].rod;
   }
 
-  
+  xN(0) = atoms[Nbeads-1].R(0);
+  xN(1) = atoms[Nbeads-1].R(1);
+  xN(2) = atoms[Nbeads-1].R(2);
+    
   return;
 
 }
@@ -824,6 +829,19 @@ void Polymer::compute_tension()
   
 }
 
+void Polymer::correct_tension()
+{
+  set_rhs_constraints();
+
+  std::cout << "Constraint equations not satisfied, see here:"
+	    << rhs_constraints << std::endl;
+  Hhat_solver.factorize(Hhat);
+  tension_change = Hhat_solver.solve(rhs_constraints);
+
+  tension = tension-tension_change;
+
+}
+
 
 void Polymer::initial_integrate(double Delta_t)
 {
@@ -911,13 +929,27 @@ void Polymer::final_integrate(double Delta_t)
   atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*atoms[i].F;
 
 
-  for (int mu = 0; mu < Nbeads -1; mu ++) {
-    std::cout << "mu = " << mu << ", constraint is not zero but "
-	      << bonds[mu].rod.dot(atoms[mu+1].R-atoms[mu].R) << std::endl;
-  }
   
   return;
 }
+
+void Polymer::set_rhs_constraints()
+{
+  int offset = 2;
+  rhs_constraints(offset-2) = atoms[0].R(0)-x0(0);
+  rhs_constraints(offset-1) = atoms[0].R(1)-x0(1);
+  rhs_constraints(offset) = atoms[0].R(2)-x0(2);
+  for (int mu = 1; mu < Nbeads; mu++) {
+    rhs_constraints(offset+mu) = (atoms[mu].R-atoms[mu-1].R).norm()-bondlength;
+  }
+
+  rhs_constraints(offset+Nbeads) = atoms[Nbeads-1].R(0)-xN(0);
+  rhs_constraints(offset+Nbeads+1) = atoms[Nbeads-1].R(1)-xN(1);
+  rhs_constraints(offset+Nbeads+2) = atoms[Nbeads-1].R(2)-xN(2);
+  return;
+
+}
+  
 
 void Polymer::rescale_positions(bool fromfront)
 {
@@ -935,33 +967,33 @@ void Polymer::rescale_positions(bool fromfront)
 
 }
 
-int Polymer::get_Nbeads()
+int Polymer::get_Nbeads() const
 {
   return Nbeads;
 }
 
 
-double Polymer::get_temp()
+double Polymer::get_temp() const
 {
   return temp;
 }
 
-double Polymer::get_zpara()
+double Polymer::get_zpara() const
 {
   return zpara;
 }
 
-double Polymer::get_zperp()
+double Polymer::get_zperp() const
 {
   return zperp;
 }
 
-double Polymer::get_bondlength()
+double Polymer::get_bondlength() const
 {
   return bondlength;
 }
 
-double Polymer::get_timescale(double dt)
+double Polymer::get_timescale(double dt) const
 {
   return dt*temp/(bondlength*zperp);
 }

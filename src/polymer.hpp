@@ -27,8 +27,8 @@ public:
 
   Eigen::VectorXd rhs_of_G;  // rhs_of_G vector
   Eigen::VectorXd rhs_of_Hhat;  // rhs_of_H vector
-  Eigen::VectorXd dummy_for_noise, tension;
-
+  Eigen::VectorXd dummy_for_noise, tension,tension_change;
+  Eigen::VectorXd rhs_constraints;
 
 
   void rescale_positions(bool);
@@ -46,7 +46,9 @@ public:
   void set_Hhat();
   void update_Hhat();
   void set_rhs_of_Hhat();
-  
+
+  void set_rhs_constraints();
+  void correct_tension();
 
   std::vector<Atom> atoms;
   std::vector<Bond> bonds;
@@ -63,15 +65,17 @@ public:
   void final_integrate(double);
 
   
-  int get_Nbeads();
-  double get_temp();
-  double get_zpara();
-  double get_zperp();
-  double get_bondlength();
-  double get_timescale(double);
+  int get_Nbeads() const;
+  double get_temp() const;
+  double get_zpara() const;
+  double get_zperp() const;
+  double get_bondlength() const;
+  double get_timescale(double) const;
   
   Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Gmunu_solver;
   Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Hhat_solver;
+
+  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > constraint_solver;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
 protected:
   int Nbeads;           // number of polymer beads
@@ -81,7 +85,7 @@ protected:
   double temp;
   double kappa;         // bare bending energy
   
-  Eigen::Vector3d x0;         // location of tethered bead
+  Eigen::Vector3d x0,xN;         // location of tethered bead
 
 
 

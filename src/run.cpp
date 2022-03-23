@@ -1,7 +1,8 @@
 #include "run.hpp"
+#include "iovtk.hpp"
 
 #include <iostream>
-#include <fstream>
+
 
 void run(GlobalParams& gp, Polymer& pmer)
 {
@@ -12,9 +13,7 @@ void run(GlobalParams& gp, Polymer& pmer)
 
   int dump_every = gp.dump_every;
 
-
-  std::ofstream myfile;
-  myfile.open(gp.dump_file);
+  double t = 0;
 
 
   pmer.compute_tangents_and_rods_and_friction();
@@ -23,27 +22,21 @@ void run(GlobalParams& gp, Polymer& pmer)
   Eigen::Vector3d endpoint(pmer.atoms[pmer.get_Nbeads()-1].R);
   
   // save at time t = 0 always.
+
+  std::string collection_name = gp.dump_file + std::string(".pvd");
+  ioVTK::writeVTKcollectionHeader(collection_name);
+
   
-  if (myfile.is_open()) {
-    
-    myfile << "TIMESTEP: " << 0 << std::endl;
-    int N = pmer.get_Nbeads();
-    Eigen::MatrixXd msave(N,6);
-    
-    Eigen::Vector3d dummy(0,0,0);
-    
-    for (int i = 0 ; i < N-1; i++) {
-      
-      msave.row(i) << pmer.atoms[i].R.transpose(), pmer.bonds[i].rod.transpose();
-    }
-    msave.row(N-1) << pmer.atoms[N-1].R.transpose(), dummy.transpose();
-    
-    myfile << msave << std::endl;
-  }
-  int max_iters = 5;
+  std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
+  ioVTK::writeVTKPolyData(fname,pmer);
+  ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+
   
+  int max_iters = 0;
+
+
   
-    
   pmer.set_unprojected_noise(dt);
   pmer.set_G();
 
@@ -55,39 +48,38 @@ void run(GlobalParams& gp, Polymer& pmer)
   pmer.compute_uc_forces();
   pmer.compute_tension();
   pmer.initial_integrate(dt);
-
-  for (int iters = 0; iters < max_iters; iters ++ ) {
   
+  pmer.compute_tangents_and_rods_and_friction();
+  
+  pmer.update_Hhat();
+  pmer.compute_uc_forces();
+  pmer.compute_tension();
+  pmer.final_integrate(dt);
+  
+  for (int iters = 0; iters < max_iters; iters ++ ) {
+    
     pmer.compute_tangents_and_rods_and_friction();
-
     pmer.update_Hhat();
     pmer.compute_uc_forces();
-    pmer.compute_tension();
-    pmer.final_integrate(dt);
-    
+    pmer.correct_tension();
+    pmer.final_integrate(dt);    
     
   }
   
   pmer.compute_tangents_and_rods_and_friction();
+  t += dt;
 
-  // save first step only if saving on every step.
-  if (myfile.is_open() && dump_every == 1) {
-    
-    myfile << "TIMESTEP: " << 1 << std::endl;
-    int N = pmer.get_Nbeads();
-    Eigen::MatrixXd msave(N,6);
-    
-    Eigen::Vector3d dummy(0,0,0);
-    
-    for (int i = 0 ; i < N-1; i++) {
-      
-      msave.row(i) << pmer.atoms[i].R.transpose(), pmer.bonds[i].rod.transpose();
-    }
-    msave.row(N-1) << pmer.atoms[N-1].R.transpose(), dummy.transpose();
-    
-    myfile << msave << std::endl;
-  }
+  if (dump_every == 1) {
+
+
+    fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
+    ioVTK::writeVTKPolyData(fname,pmer);
+
+    ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+
+  }
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
     
@@ -100,48 +92,43 @@ void run(GlobalParams& gp, Polymer& pmer)
     pmer.compute_tension();
     pmer.initial_integrate(dt);
     
-
-
+    pmer.compute_tangents_and_rods_and_friction();
+    
+    pmer.update_Hhat();
+    pmer.compute_uc_forces();
+    pmer.compute_tension();
+    pmer.final_integrate(dt);
 
     for (int iters = 0; iters < max_iters; iters ++ ) {
-      
+
       pmer.compute_tangents_and_rods_and_friction();
-      
       pmer.update_Hhat();
       pmer.compute_uc_forces();
-      pmer.compute_tension();
-      pmer.final_integrate(dt);
-      
+      pmer.correct_tension();
+      pmer.final_integrate(dt);    
       
     }
     pmer.compute_tangents_and_rods_and_friction();  
-    
-    if (myfile.is_open() && i % dump_every == 0) {
+    t += dt;
 
-      myfile << "TIMESTEP: " << i << std::endl;
-      int N = pmer.get_Nbeads();
-      Eigen::MatrixXd msave(N,6);
-      
-      Eigen::Vector3d dummy(0,0,0);
+    if (i % dump_every == 0) {
+      fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
+  
+      ioVTK::writeVTKPolyData(fname,pmer);
 
-      for (int i = 0 ; i < N-1; i++) {
-
-	msave.row(i) << pmer.atoms[i].R.transpose(), pmer.bonds[i].rod.transpose();
-      }
-      msave.row(N-1) << pmer.atoms[N-1].R.transpose(), dummy.transpose();
-      
-      myfile << msave << std::endl;
+      ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
     }
-
       
   }
 
+
+  ioVTK::writeVTKcollectionFooter(collection_name);
   
   double norm;
   
   std::cout << "difference in start position = " << pmer.atoms[0].R-startpoint << std::endl;
   for (int mu = 0; mu < pmer.get_Nbeads()-1; mu++) {
-    norm = sqrt((pmer.atoms[mu+1].R-pmer.atoms[mu].R).dot(pmer.atoms[mu+1].R-pmer.atoms[mu].R));
+    norm = (pmer.atoms[mu+1].R-pmer.atoms[mu].R).norm();
     
     std::cout << "mu = " << mu << ", |u_mu|/a = " << norm/pmer.get_bondlength() << std::endl;
   }
@@ -149,6 +136,6 @@ void run(GlobalParams& gp, Polymer& pmer)
   std::cout << "difference in end position = "
 	    << pmer.atoms[pmer.get_Nbeads()-1].R-endpoint << std::endl;
   
-  myfile.close();
+
   return;
 }
