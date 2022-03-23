@@ -89,7 +89,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   /* Then check the RHS of the H eqn . */
 
   pmer.compute_uc_forces();
-  pmer.set_rhs_of_Hhat();
+  pmer.set_rhs_of_Hhat(dt/2);
 
   std::cout << "RHS of H eqn: " << std::endl;
 
@@ -104,7 +104,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   
   
   /* Compare the dynamic projection in the two cases. */
-  pmer.compute_tension();
+  pmer.compute_tension(dt/2);
   pmer.initial_integrate(dt);
 
   Eigen::MatrixXd Hinv = test.invert_matrix(Hhat);  
@@ -152,7 +152,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   //  std::cout << pmer.Hhat << std::endl;
   //  std::cout << test.compute_Hhat() << std::endl;
   pmer.compute_uc_forces();
-  pmer.compute_tension();
+  pmer.compute_tension(dt);
   pmer.final_integrate(dt);
 
 

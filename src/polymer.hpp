@@ -45,7 +45,7 @@ public:
   SpMat Hhat;      // dynamical tensor
   void set_Hhat();
   void update_Hhat();
-  void set_rhs_of_Hhat();
+  void set_rhs_of_Hhat(double );
 
   void set_rhs_constraints();
   void correct_tension();
@@ -56,7 +56,7 @@ public:
   void set_unprojected_noise(double);
 
   void compute_noise();
-  void compute_tension();
+  void compute_tension(double);
   void compute_uc_forces();
   
   void single_inv_friction(int);

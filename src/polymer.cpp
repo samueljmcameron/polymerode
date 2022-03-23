@@ -484,16 +484,19 @@ void Polymer::compute_effective_kappa()
 /* ---------------------------------------------------------------------------- */
 /* RHS of Hhat*lambda = Q. */
 /* ---------------------------------------------------------------------------- */
-void Polymer::set_rhs_of_Hhat()
+void Polymer::set_rhs_of_Hhat(double t)
 {
 
 
   int offset = 2;
 
+  double omega = 100.0;
+  double rad = 0.1;
+  
   Eigen::Vector3d tmp = atoms[0].friction*atoms[0].F;
 
-  rhs_of_Hhat(-2+offset) = tmp(0);
-  rhs_of_Hhat(-1+offset) = tmp(1);
+  rhs_of_Hhat(-2+offset) = tmp(0) + omega*rad*sin(omega*t);
+  rhs_of_Hhat(-1+offset) = tmp(1) - omega*rad*cos(omega*t);
   rhs_of_Hhat(0+offset) = tmp(2);
   
   for (int i = 0; i< Nbeads-1; i++) {
@@ -820,9 +823,9 @@ void Polymer::compute_noise()
 }
 
 
-void Polymer::compute_tension()
+void Polymer::compute_tension(double t)
 {
-  set_rhs_of_Hhat();
+  set_rhs_of_Hhat(t);
   Hhat_solver.factorize(Hhat);
 
   tension =  Hhat_solver.solve(rhs_of_Hhat);

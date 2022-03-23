@@ -15,7 +15,6 @@ void run(GlobalParams& gp, Polymer& pmer)
 
   double t = 0;
 
-
   pmer.compute_tangents_and_rods_and_friction();
 
   Eigen::Vector3d startpoint(pmer.atoms[0].R);
@@ -46,14 +45,14 @@ void run(GlobalParams& gp, Polymer& pmer)
   
   pmer.compute_noise();
   pmer.compute_uc_forces();
-  pmer.compute_tension();
+  pmer.compute_tension(t+dt/2);
   pmer.initial_integrate(dt);
   
   pmer.compute_tangents_and_rods_and_friction();
   
   pmer.update_Hhat();
   pmer.compute_uc_forces();
-  pmer.compute_tension();
+  pmer.compute_tension(t+dt);
   pmer.final_integrate(dt);
   
   for (int iters = 0; iters < max_iters; iters ++ ) {
@@ -89,14 +88,14 @@ void run(GlobalParams& gp, Polymer& pmer)
     pmer.update_Hhat();
     pmer.compute_noise();
     pmer.compute_uc_forces();
-    pmer.compute_tension();
+    pmer.compute_tension(t+dt/2);
     pmer.initial_integrate(dt);
     
     pmer.compute_tangents_and_rods_and_friction();
     
     pmer.update_Hhat();
     pmer.compute_uc_forces();
-    pmer.compute_tension();
+    pmer.compute_tension(t+dt);
     pmer.final_integrate(dt);
 
     for (int iters = 0; iters < max_iters; iters ++ ) {
@@ -125,6 +124,13 @@ void run(GlobalParams& gp, Polymer& pmer)
   ioVTK::writeVTKcollectionFooter(collection_name);
   
   double norm;
+
+  double omega = 100.0;
+  double rad = 0.1;
+
+  startpoint(0) += rad*(cos(omega*t)-1);
+  startpoint(1) += rad*sin(omega*t);
+
   
   std::cout << "difference in start position = " << pmer.atoms[0].R-startpoint << std::endl;
   for (int mu = 0; mu < pmer.get_Nbeads()-1; mu++) {
