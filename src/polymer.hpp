@@ -25,44 +25,76 @@ public:
   
   std::vector<Eigen::Vector3d> Rtmp;    // temporary storate for midstep
 
-  Eigen::VectorXd rhs_of_G;  // rhs_of_G vector
-  Eigen::VectorXd rhs_of_Hhat;  // rhs_of_H vector
-  Eigen::VectorXd dummy_for_noise, tension,tension_change;
-  Eigen::VectorXd rhs_constraints;
 
+  
+
+  
+  Eigen::VectorXd dummy_for_noise, tension,negative_tension_change;
+  Eigen::VectorXd constraint_errors;
+  double omega, rad;
 
   void rescale_positions(bool);
 
   virtual void init_atoms();
   void compute_tangents_and_rods_and_friction();
 
+  void set_unprojected_noise(double);
+
   
+  void test_jacob(int,double,double);  
+
+  Eigen::VectorXd rhs_of_G;  // rhs_of_G vector
+  void set_rhs_of_G();
+
   SpMat Gmunu;      // geometric tensor
   void set_G();
   void update_G();
-  void set_rhs_of_G();
+
+
+  void compute_uc_forces();
+
   
-  SpMat Hhat;      // dynamical tensor
+  Eigen::VectorXd rhs_of_Hhat;  // rhs_of_H vector AND dC vector
+  void set_rhs_of_Hhat(double );
+  
+  SpMat Hhat;      // dynamical (hydrodynamic) tensor
   void set_Hhat();
   void update_Hhat();
-  void set_rhs_of_Hhat(double );
 
-  void set_rhs_constraints();
-  void correct_tension();
+
+
+  void update_const_part_dC(double, double);
+  
+  Eigen::VectorXd rhs_tmp;  // temp vector for updating dC
+  void compute_tmp_for_dC(double);
+
+  SpMat dCdlambda; // matrix for storing Jacobian of dC=0 Newton solver
+  SpMat mat_tmp;  // temporary matrix for storing parts of dCdlambda which change upon iteration
+  void set_dCdlambda();
+  void update_const_part_dCdlambda(double);
+  void compute_tmp_mat_dCdlambda(double);
+
+
+
+  void correct_tension(double,double);
+  void compute_rhs_constraintfix(int ,double ,double);
 
   std::vector<Atom> atoms;
   std::vector<Bond> bonds;
 
-  void set_unprojected_noise(double);
+
 
   void compute_noise();
   void compute_tension(double);
-  void compute_uc_forces();
+
   
   void single_inv_friction(int);
 
   void initial_integrate(double);
   void final_integrate(double);
+
+  void calculate_constraint_errors();  
+  void modify_rhs_Hhat(int , double, double);
 
   
   int get_Nbeads() const;
@@ -75,8 +107,11 @@ public:
   Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Gmunu_solver;
   Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Hhat_solver;
 
-  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > constraint_solver;
+  Eigen::SparseLU< SpMat > jacob_solver;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
+
+  std::vector<Eigen::VectorXd> tension_corrections;
+  
 protected:
   int Nbeads;           // number of polymer beads
   double bondlength;    // length of rods connecting beads
@@ -96,18 +131,24 @@ private:
 
   std::uniform_real_distribution<double> dist;
 
-
-
-  
   std::vector<T> init_G_coeffsmatrix();
 
+  
+  void compute_effective_kappa();
+
+  std::vector<T> init_Hhat_coeffsmatrix();  
+
+  std::vector<T> init_dCdlambda_coeffsmatrix();
+  std::vector<T> init_tmp_mat_coeffsmatrix();
+  
   double Hhat_diag_val(int);
   double Hhat_loweroff_val(int);
 
   double Hhat_endblocks(int,int,int);
   double Hhat_leftside(int);
   double Hhat_bottomside(int);
-  std::vector<T> init_Hhat_coeffsmatrix();
+
+
 
   Eigen::VectorXd tDets;
   Eigen::VectorXd bDets;
@@ -116,7 +157,7 @@ private:
   Eigen::VectorXd k_effs;
   Eigen::VectorXd end_inverses;
 
-  void compute_effective_kappa();
+
 
 
 };

@@ -7,7 +7,7 @@ project(poly VERSION 1.0 DESCRIPTION "Single tethered polymer dynamics"
         LANGUAGES CXX)
 
 
-add_compile_options(-O3 -Wall -Wextra)
+add_compile_options(-O3 -Wall -Wextra -g)
 
 message("${CMAKE_MODULE_PATH}")
 

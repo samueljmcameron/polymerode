@@ -11,7 +11,7 @@ public:
 
   
   Eigen::Vector3d R;
-  Eigen::Vector3d F;
+  Eigen::Vector3d Fpot, t_force;
   Eigen::Vector3d noise;
   Eigen::Vector3d unprojected_noise;
   Eigen::Vector3d tangent;

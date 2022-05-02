@@ -1,5 +1,7 @@
 #include "polymer.hpp"
 #include "input.hpp"
+#include "utilfuncs.hpp"
+
 
 #include <iostream>
 #include <cmath>
@@ -92,7 +94,6 @@ Polymer::Polymer(std::vector<std::string> splitvec)
   }
     
   atoms = std::vector<Atom> (Nbeads);
-
   bonds = std::vector<Bond>(Nbeads-1);
   
   Rtmp.resize(Nbeads);
@@ -100,14 +101,29 @@ Polymer::Polymer(std::vector<std::string> splitvec)
   rhs_of_G.resize(Nbeads+5);
   dummy_for_noise.resize(Nbeads+5);
   Gmunu.resize(Nbeads+5,Nbeads+5);
-  Hhat.resize(Nbeads+5,Nbeads+5);
-  rhs_of_Hhat.resize(Nbeads+5);
+
+
   
+
+  rhs_of_Hhat.resize(Nbeads+5);
   tension.resize(Nbeads+5);
+  Hhat.resize(Nbeads+5,Nbeads+5);
 
-  rhs_constraints.resize(Nbeads+5);
-  tension_change.resize(Nbeads+5);
 
+  
+  dCdlambda.resize(Nbeads+5,Nbeads+5);
+  mat_tmp.resize(Nbeads+5,Nbeads+5);
+  rhs_tmp.resize(Nbeads+5);
+
+  
+
+
+  constraint_errors.resize(Nbeads+5);
+
+  negative_tension_change.resize(Nbeads+5);
+
+
+  
   tDets.resize(Nbeads+3);
   bDets.resize(Nbeads+3);
 
@@ -120,6 +136,10 @@ Polymer::Polymer(std::vector<std::string> splitvec)
   gen.seed(seed);
 
   init_atoms();
+
+  omega = 100.0;
+  rad = 0.0*0.1;
+
   
 }
 
@@ -205,19 +225,6 @@ void Polymer::init_atoms()
 
 }
 
-
-void Polymer::single_inv_friction(int i)
-{
-  double tmp = 1./zpara-1./zperp;
-  atoms[i].friction = tmp*atoms[i].tangent*atoms[i].tangent.transpose();
-  
-  for (int j = 0; j < 3; j++ )
-
-    atoms[i].friction(j,j) += 1./zperp;
-
-  return;
-
-}
 
 
 /* ---------------------------------------------------------------------------- */
@@ -350,7 +357,7 @@ void Polymer::set_G()
 /* -------------------------------------------------------------------------- */
 std::vector<T> Polymer::init_G_coeffsmatrix()
 {
-  // just set lower diagonal for some reason..?
+  // just set lower diagonal
   int offset = 2;
   std::vector<T> coeffs;
   coeffs.push_back(T(offset-2,offset-2,1));
@@ -481,6 +488,74 @@ void Polymer::compute_effective_kappa()
 }
 
 
+/* -------------------------------------------------------------------------- */
+/* Compute forces on the particles. */
+/* -------------------------------------------------------------------------- */
+void Polymer::compute_uc_forces()
+{
+
+  compute_effective_kappa();
+
+  atoms[0].Fpot = (end_inverses(0)*bonds[0].rod*(bonds[0].rod(0))
+		   +end_inverses(1)*bonds[0].rod*(bonds[0].rod(1))
+		   +end_inverses(2)*bonds[0].rod*(bonds[0].rod(2))
+		   -1*k_effs(0)*(bonds[1].rod-costhetas(0)*bonds[0].rod));
+
+  atoms[0].Fpot(0) += -1*end_inverses(0);
+  atoms[0].Fpot(1) += -1*end_inverses(1);
+  atoms[0].Fpot(2) += -1*end_inverses(2);
+
+  atoms[1].Fpot = (-1*end_inverses(0)*bonds[0].rod*(bonds[0].rod(0))
+		-end_inverses(1)*bonds[0].rod*(bonds[0].rod(1))
+		-end_inverses(2)*bonds[0].rod*(bonds[0].rod(2))
+		+k_effs(0)*(bonds[1].rod-costhetas(0)*bonds[0].rod
+			    - (bonds[0].rod-costhetas(0)*bonds[1].rod))
+		- k_effs(1)*(bonds[2].rod-costhetas(1)*bonds[1].rod));
+
+  // bug here???
+  atoms[0].Fpot(0) += end_inverses(0);
+  atoms[0].Fpot(1) += end_inverses(1);
+  atoms[0].Fpot(2) += end_inverses(2);
+
+  
+
+  			
+  for (int k = 2; k < Nbeads-2; k++) {
+
+    atoms[k].Fpot = (k_effs(k-1)*(bonds[k].rod-costhetas(k-1)*bonds[k-1].rod
+				  -(bonds[k-1].rod-costhetas(k-1)*bonds[k].rod))
+		     -k_effs(k)*(bonds[k+1].rod-costhetas(k)*bonds[k].rod)
+		     +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod));
+    
+  }
+
+  int k = Nbeads-2;
+  
+  atoms[k].Fpot = (-1*end_inverses(3)*bonds[k].rod*bonds[k].rod(0)
+		   -end_inverses(4)*bonds[k].rod*bonds[k].rod(1)
+		   -end_inverses(5)*bonds[k].rod*bonds[k].rod(2)
+		   +k_effs(k-1)*(bonds[k].rod-costhetas(k-1)*bonds[k-1].rod
+				 -(bonds[k-1].rod-costhetas(k-1)*bonds[k].rod))
+		   +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod));
+
+  atoms[k].Fpot(0) += end_inverses(3);
+  atoms[k].Fpot(1) += end_inverses(4);
+  atoms[k].Fpot(2) += end_inverses(5);
+
+  k = Nbeads-1;
+
+  atoms[k].Fpot = (end_inverses(3)*bonds[k-1].rod*bonds[k-1].rod(0)
+		   +end_inverses(4)*bonds[k-1].rod*bonds[k-1].rod(1)
+		   +end_inverses(5)*bonds[k-1].rod*bonds[k-1].rod(2)
+		   +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod));
+  
+  // and here???  
+  return;
+  
+}
+
+
+
 /* ---------------------------------------------------------------------------- */
 /* RHS of Hhat*lambda = Q. */
 /* ---------------------------------------------------------------------------- */
@@ -490,10 +565,8 @@ void Polymer::set_rhs_of_Hhat(double t)
 
   int offset = 2;
 
-  double omega = 100.0;
-  double rad = 0.1;
   
-  Eigen::Vector3d tmp = atoms[0].friction*atoms[0].F;
+  Eigen::Vector3d tmp = atoms[0].friction*(atoms[0].Fpot+atoms[0].noise);
 
   rhs_of_Hhat(-2+offset) = tmp(0) + omega*rad*sin(omega*t);
   rhs_of_Hhat(-1+offset) = tmp(1) - omega*rad*cos(omega*t);
@@ -502,12 +575,14 @@ void Polymer::set_rhs_of_Hhat(double t)
   for (int i = 0; i< Nbeads-1; i++) {
 
 
-    rhs_of_Hhat(i+offset+1) = bonds[i].rod.dot(atoms[i+1].friction*atoms[i+1].F
-					     -atoms[i].friction*atoms[i].F);
+    rhs_of_Hhat(i+offset+1) = bonds[i].rod.dot(atoms[i+1].friction*(atoms[i+1].Fpot
+								    +atoms[i+1].noise)
+					       -atoms[i].friction*(atoms[i].Fpot
+								   +atoms[i].noise));
     
   }
 
-  tmp = atoms[Nbeads-1].friction*atoms[Nbeads-1].F;
+  tmp = atoms[Nbeads-1].friction*(atoms[Nbeads-1].Fpot+atoms[Nbeads-1].noise);
   rhs_of_Hhat(offset+Nbeads) = tmp(0);
   rhs_of_Hhat(offset+Nbeads+1) = tmp(1);
   rhs_of_Hhat(offset+Nbeads+2) = tmp(2);
@@ -518,76 +593,6 @@ void Polymer::set_rhs_of_Hhat(double t)
 
 
 
-/* -------------------------------------------------------------------------- */
-/* Compute forces on the particles. */
-/* -------------------------------------------------------------------------- */
-void Polymer::compute_uc_forces()
-{
-
-  compute_effective_kappa();
-
-  atoms[0].F = (end_inverses(0)*bonds[0].rod*(bonds[0].rod(0))
-		+end_inverses(1)*bonds[0].rod*(bonds[0].rod(1))
-		+end_inverses(2)*bonds[0].rod*(bonds[0].rod(2))
-		-1*k_effs(0)*(bonds[1].rod-costhetas(0)*bonds[0].rod)
-		+ atoms[0].noise);
-
-  atoms[0].F(0) += -1*end_inverses(0);
-  atoms[0].F(1) += -1*end_inverses(1);
-  atoms[0].F(2) += -1*end_inverses(2);
-
-  atoms[1].F = (-1*end_inverses(0)*bonds[0].rod*(bonds[0].rod(0))
-		-end_inverses(1)*bonds[0].rod*(bonds[0].rod(1))
-		-end_inverses(2)*bonds[0].rod*(bonds[0].rod(2))
-		+k_effs(0)*(bonds[1].rod-costhetas(0)*bonds[0].rod
-			    - (bonds[0].rod-costhetas(0)*bonds[1].rod))
-		- k_effs(1)*(bonds[2].rod-costhetas(1)*bonds[1].rod)
-		+ atoms[1].noise);
-
-
-  atoms[0].F(0) += end_inverses(0);
-  atoms[0].F(1) += end_inverses(1);
-  atoms[0].F(2) += end_inverses(2);
-
-  
-
-  			
-  for (int k = 2; k < Nbeads-2; k++) {
-
-    atoms[k].F = (k_effs(k-1)*(bonds[k].rod-costhetas(k-1)*bonds[k-1].rod
-			       -(bonds[k-1].rod-costhetas(k-1)*bonds[k].rod))
-		  -k_effs(k)*(bonds[k+1].rod-costhetas(k)*bonds[k].rod)
-		  +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod)
-		  +atoms[k].noise);
-    
-  }
-
-  int k = Nbeads-2;
-  
-  atoms[k].F = (-1*end_inverses(3)*bonds[k].rod*bonds[k].rod(0)
-		-end_inverses(4)*bonds[k].rod*bonds[k].rod(1)
-		-end_inverses(5)*bonds[k].rod*bonds[k].rod(2)
-		+k_effs(k-1)*(bonds[k].rod-costhetas(k-1)*bonds[k-1].rod
-			     -(bonds[k-1].rod-costhetas(k-1)*bonds[k].rod))
-		+k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod)
-		+atoms[k].noise);
-
-  atoms[k].F(0) += end_inverses(3);
-  atoms[k].F(1) += end_inverses(4);
-  atoms[k].F(2) += end_inverses(5);
-
-  k = Nbeads-1;
-
-  atoms[k].F = (end_inverses(3)*bonds[k-1].rod*bonds[k-1].rod(0)
-		+end_inverses(4)*bonds[k-1].rod*bonds[k-1].rod(1)
-		+end_inverses(5)*bonds[k-1].rod*bonds[k-1].rod(2)
-		+k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod)
-		+atoms[k].noise);
-  
-  
-  return;
-  
-}
 
 
 
@@ -601,6 +606,7 @@ void Polymer::set_Hhat()
 
   Hhat.setFromTriplets(coefficients.begin(),coefficients.end());
 
+
   Hhat_solver.analyzePattern(Hhat);
 
   return;
@@ -608,75 +614,13 @@ void Polymer::set_Hhat()
 }
 
 
-double Polymer::Hhat_diag_val(int mu)
-{
-
-
-  double tmp1 = atoms[mu].tangent.dot(bonds[mu].rod);
-  tmp1 = tmp1*tmp1;
-
-
-  double tmp2 =  atoms[mu+1].tangent.dot(bonds[mu].rod);
-  tmp2 = tmp2*tmp2;
-
-
-  return 2./zperp + (1./zpara-1./zperp)*(tmp1+tmp2);
-
-}
-
-/* NOte that there is a typo in the paper I'm basing this off of
-   (Montesi et al, 2005) , which is why there is a difference between
-   my off-diagonal H values and theirs. In their equation 34, anywhere
-   there is a mu+1, it should be a mu-1. */
-double Polymer::Hhat_loweroff_val(int mu)
-{
-
-  double tmp1 = bonds[mu-1].rod.dot(bonds[mu].rod);
-  double tmp2 = bonds[mu-1].rod.dot(atoms[mu].tangent);
-  double tmp3 = atoms[mu].tangent.dot(bonds[mu].rod);
-
-  return -1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3;
-
-}
-
-double Polymer::Hhat_endblocks(int first, int second,int mu)
-{
-  double extra = 0;
-
-  if (first == second) extra = 1;
-  
-  return (extra/zperp + (1./zpara-1./zperp)*atoms[mu].tangent(first)
-	  *atoms[mu].tangent(second));
-
-}
-
-
-double Polymer::Hhat_leftside(int first)
-{
-
-  double tmp =  atoms[0].tangent.dot(bonds[0].rod)*atoms[0].tangent(first);
-
-  
-  return -1*(1./zpara-1./zperp)*tmp - bonds[0].rod(first)/zperp;
-
-}
-
-double Polymer::Hhat_bottomside(int first)
-{
-
-  double tmp =  atoms[Nbeads-1].tangent.dot(bonds[Nbeads-2].rod)*atoms[Nbeads-1].tangent(first);
-
-  
-  return (1./zpara-1./zperp)*tmp + bonds[Nbeads-2].rod(first)/zperp;
-
-}
-
-
 /* -------------------------------------------------------------------------- */
-/* Helper function to initialise matrix M. */
+/* Helper function to initialise matrix H hat. */
 /* -------------------------------------------------------------------------- */
 std::vector<T> Polymer::init_Hhat_coeffsmatrix()
 {
+
+  // only use lower triangular part as it's a symmetric matrix.  
   std::vector<T> coeffs;
 
   int offset = 2;
@@ -722,6 +666,10 @@ std::vector<T> Polymer::init_Hhat_coeffsmatrix()
 
   
 }
+
+
+
+
 
 
 /* -------------------------------------------------------------------------- */
@@ -784,6 +732,603 @@ void Polymer::update_Hhat()
 }
 
 
+void Polymer::update_const_part_dC(double Delta_t, double t)
+{
+  int offset = 2;
+  Eigen::Vector3d A_mu;
+  Eigen::Vector3d A_mu_p1;
+
+
+  // add all the lambda independent terms to rhs of Hhat
+
+  rhs_of_Hhat(-2+offset) -= rad*omega*(0.5*Delta_t*omega*cos(omega*t));
+  rhs_of_Hhat(-1+offset) -= rad*omega*(0.5*Delta_t*omega*sin(omega*t));
+  rhs_of_Hhat(offset) += 0.0;
+  
+  
+  for (int mu = 1; mu < Nbeads; mu++) {
+    A_mu = atoms[mu-1].friction*(atoms[mu-1].noise+atoms[mu-1].Fpot);
+    A_mu_p1 = atoms[mu].friction*(atoms[mu].noise+atoms[mu].Fpot);
+    
+    rhs_of_Hhat(mu+offset) += utilFuncs::compute_rhs_helper(A_mu,A_mu_p1,A_mu,A_mu_p1,
+  							    bonds, 0.5,Delta_t,
+  							    bondlength,mu);
+    
+  }
+
+  return;
+}
+
+void Polymer::compute_tmp_for_dC(double Delta_t)
+{
+
+  // for each element in the rhs_of_Hhat vector, you must first subtract the
+  // temporary bit (holding the lambda dependent part), then reevaluate the
+  // temporary bit using the new values of the lambdas, and then add this
+  // new temporary bit to the rhs_of_Hhat vector.
+  int offset = 2;
+
+
+
+  Eigen::Vector3d A_mu;
+  Eigen::Vector3d A_mu_p1;
+  Eigen::Vector3d B_mu;
+  Eigen::Vector3d B_mu_p1;
+
+
+  int mu = -2;
+
+
+  rhs_tmp(mu+offset) = -(Hhat_endblocks(0,0,0)*tension(-2+offset)
+			  +Hhat_endblocks(1,0,0)*tension(-1+offset)
+			  +Hhat_endblocks(2,0,0)*tension(offset)
+			  +Hhat_leftside(0)*tension(1+offset));
+
+  mu = -1;
+
+  rhs_tmp(mu+offset) = -(Hhat_endblocks(1,0,0)*tension(-2+offset)
+			  +Hhat_endblocks(1,1,0)*tension(-1+offset)
+			  +Hhat_endblocks(2,1,0)*tension(offset)
+			  +Hhat_leftside(1)*tension(1+offset));
+
+  mu = 0;
+
+    
+  rhs_tmp(mu+offset) = -(Hhat_endblocks(2,0,0)*tension(-2+offset)
+			  +Hhat_endblocks(2,1,0)*tension(-1+offset)
+			  +Hhat_endblocks(2,2,0)*tension(offset)
+			  +Hhat_leftside(2)*tension(1+offset));
+
+  mu = 1;
+
+  
+  rhs_tmp(mu+offset) = -(Hhat_leftside(0)*tension(-2+offset)
+			 +Hhat_leftside(1)*tension(-1+offset)
+			 +Hhat_leftside(2)*tension(offset)
+			 +Hhat_diag_val(0)*tension(1+offset)
+			 +Hhat_loweroff_val(1)*tension(2+offset));
+
+  
+  A_mu = atoms[mu-1].friction*(atoms[mu-1].noise+atoms[mu-1].Fpot);
+  A_mu_p1 = atoms[mu].friction*(atoms[mu].noise+atoms[mu].Fpot);
+  
+  utilFuncs::calc_A_1(B_mu,bonds,atoms,tension);
+  utilFuncs::calc_A_i(B_mu_p1,bonds,atoms,tension,1);
+  rhs_tmp(mu+offset) += utilFuncs::compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,bonds,
+    						      -1,Delta_t,bondlength,mu);
+  rhs_tmp(mu+offset) += utilFuncs::compute_rhs_helper(B_mu,B_mu_p1,B_mu,B_mu_p1,bonds,
+    						      0.5,Delta_t,bondlength,mu);
+
+
+
+  for (mu = 2; mu < Nbeads-1; mu++) {
+
+    rhs_tmp(mu+offset) = -(Hhat_loweroff_val(mu-1)*tension(mu-1+offset)
+			   +Hhat_diag_val(mu-1)*tension(mu+offset)
+			   +Hhat_loweroff_val(mu)*tension(mu+1+offset));
+
+
+    A_mu = atoms[mu-1].friction*(atoms[mu-1].noise+atoms[mu-1].Fpot);
+    A_mu_p1 = atoms[mu].friction*(atoms[mu].noise+atoms[mu].Fpot);
+
+    B_mu = B_mu_p1;
+    utilFuncs::calc_A_i(B_mu_p1,bonds,atoms,tension,mu);
+
+    rhs_tmp(mu+offset) += utilFuncs::compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,bonds,
+    							-1,Delta_t,bondlength,mu);
+    rhs_tmp(mu+offset) += utilFuncs::compute_rhs_helper(B_mu,B_mu_p1,B_mu,B_mu_p1,bonds,
+    							0.5,Delta_t,bondlength,mu);
+
+    
+  }
+
+  mu = Nbeads-1;
+
+  rhs_tmp(mu+offset) = -(Hhat_loweroff_val(mu-1)*tension(mu-1+offset)
+			 +Hhat_diag_val(mu-1)*tension(mu+offset)
+			 +Hhat_bottomside(0)*tension(Nbeads+offset)
+			 +Hhat_bottomside(1)*tension(Nbeads+1+offset)
+			 +Hhat_bottomside(2)*tension(Nbeads+2+offset));
+  
+
+  A_mu = atoms[mu-1].friction*(atoms[mu-1].noise+atoms[mu-1].Fpot);
+  A_mu_p1 = atoms[mu].friction*(atoms[mu].noise+atoms[mu].Fpot);
+  B_mu = B_mu_p1;
+  utilFuncs::calc_A_N(B_mu_p1,bonds,atoms,tension);
+  
+  rhs_tmp(mu+offset) += utilFuncs::compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,bonds,
+  						      -1,Delta_t, bondlength,mu);
+  rhs_tmp(mu+offset) += utilFuncs::compute_rhs_helper(B_mu,B_mu_p1,B_mu,B_mu_p1,bonds,
+  						      0.5,Delta_t,bondlength,mu);
+  
+
+  mu = Nbeads;
+  
+
+  rhs_tmp(mu+offset) = -(Hhat_bottomside(0)*tension(Nbeads-1+offset)
+			  +Hhat_endblocks(0,0,Nbeads-1)*tension(Nbeads+offset)
+			  +Hhat_endblocks(1,0,Nbeads-1)*tension(Nbeads+1+offset)
+			  +Hhat_endblocks(2,0,Nbeads-1)*tension(Nbeads+2+offset));
+
+
+  mu = Nbeads+1;
+
+
+  rhs_tmp(mu+offset) = -(Hhat_bottomside(1)*tension(Nbeads-1+offset)
+			  +Hhat_endblocks(1,0,Nbeads-1)*tension(Nbeads+offset)
+			  +Hhat_endblocks(1,1,Nbeads-1)*tension(Nbeads+1+offset)
+			  +Hhat_endblocks(2,1,Nbeads-1)*tension(Nbeads+2+offset));
+
+
+  mu = Nbeads+2;
+
+
+  
+  rhs_tmp(mu+offset) = -(Hhat_bottomside(2)*tension(Nbeads-1+offset)
+			  +Hhat_endblocks(2,0,Nbeads-1)*tension(Nbeads+offset)
+			  +Hhat_endblocks(2,1,Nbeads-1)*tension(Nbeads+1+offset)
+			  +Hhat_endblocks(2,2,Nbeads-1)*tension(Nbeads+2+offset));
+  
+  return;
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Initialise both the dCdlambda and mat_tmp matrices. */
+/* -------------------------------------------------------------------------- */
+void Polymer::set_dCdlambda()
+{
+
+  std::vector<T> coefficients = init_dCdlambda_coeffsmatrix();
+
+  dCdlambda.setFromTriplets(coefficients.begin(),coefficients.end());
+
+  jacob_solver.analyzePattern(dCdlambda);
+
+  coefficients = init_tmp_mat_coeffsmatrix();
+
+  mat_tmp.setFromTriplets(coefficients.begin(),coefficients.end());
+
+  return;
+
+}
+
+
+
+/* -------------------------------------------------------------------------- */
+/* Helper function to initialise matrix dCdlambda. */
+/* -------------------------------------------------------------------------- */
+std::vector<T> Polymer::init_dCdlambda_coeffsmatrix()
+{
+
+  // initializing the vector as the full (both upper and lower) part of Hhat, since
+  // this matrix won't be symmetric.
+  std::vector<T> coeffs;
+
+  int offset = 2;
+
+  coeffs.push_back(T(offset-2,offset-2,Hhat_endblocks(0,0,0)));
+  coeffs.push_back(T(offset-2,offset-1,Hhat_endblocks(1,0,0)));
+  coeffs.push_back(T(offset-2,offset,Hhat_endblocks(2,0,0)));
+  coeffs.push_back(T(offset-2,offset+1,Hhat_leftside(0)));
+  
+  
+  coeffs.push_back(T(offset-1,offset-2,Hhat_endblocks(1,0,0)));
+  coeffs.push_back(T(offset-1,offset-1,Hhat_endblocks(1,1,0)));
+  coeffs.push_back(T(offset-1,offset,Hhat_endblocks(2,1,0)));
+  coeffs.push_back(T(offset-1,offset+1,Hhat_leftside(1)));
+  
+  coeffs.push_back(T(offset,offset-2,Hhat_endblocks(2,0,0)));
+  coeffs.push_back(T(offset,offset-1,Hhat_endblocks(2,1,0)));
+  coeffs.push_back(T(offset,offset,Hhat_endblocks(2,2,0)));
+  coeffs.push_back(T(offset,offset+1,Hhat_leftside(2)));
+
+  
+  coeffs.push_back(T(offset+1,offset-2,Hhat_leftside(0)));
+  coeffs.push_back(T(offset+1,offset-1,Hhat_leftside(1)));
+  coeffs.push_back(T(offset+1,offset,Hhat_leftside(2)));
+  coeffs.push_back(T(offset+1,offset+1,Hhat_diag_val(0)));
+  
+  
+  for (int i = 1; i < Nbeads-1; i++) {
+    coeffs.push_back(T(i+offset,i+offset+1,Hhat_loweroff_val(i)));
+    coeffs.push_back(T(i+offset+1,i+offset+1,Hhat_diag_val(i)));
+    coeffs.push_back(T(i+offset+1,i+offset,Hhat_loweroff_val(i)));
+
+
+  }
+
+  
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads,Hhat_bottomside(0)));
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads+1,Hhat_bottomside(1)));
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads+2,Hhat_bottomside(2)));
+
+  
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads-1,Hhat_bottomside(0)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads,Hhat_endblocks(0,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads+1,Hhat_endblocks(1,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads+2,Hhat_endblocks(2,0,Nbeads-1)));
+  
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads-1,Hhat_bottomside(1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads,Hhat_endblocks(1,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+1,Hhat_endblocks(1,1,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+2,Hhat_endblocks(2,1,Nbeads-1)));
+  
+  
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads-1,Hhat_bottomside(2)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads,Hhat_endblocks(2,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+1,Hhat_endblocks(2,1,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+2,Hhat_endblocks(2,2,Nbeads-1)));
+
+  return coeffs;
+
+
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Helper function to initialise temporary matrix. */
+/* -------------------------------------------------------------------------- */
+std::vector<T> Polymer::init_tmp_mat_coeffsmatrix()
+{
+
+  // initializing the vector as the full (both upper and lower) part of Hhat, since
+  // this matrix won't be symmetric.
+  std::vector<T> coeffs;
+
+  int offset = 2;
+
+  coeffs.push_back(T(offset-2,offset-2,0));
+  coeffs.push_back(T(offset-2,offset-1,0));
+  coeffs.push_back(T(offset-2,offset,0));
+  coeffs.push_back(T(offset-2,offset+1,0));
+  
+  
+  coeffs.push_back(T(offset-1,offset-2,0));
+  coeffs.push_back(T(offset-1,offset-1,0));
+  coeffs.push_back(T(offset-1,offset,0));
+  coeffs.push_back(T(offset-1,offset+1,0));
+  
+  coeffs.push_back(T(offset,offset-2,0));
+  coeffs.push_back(T(offset,offset-1,0));
+  coeffs.push_back(T(offset,offset,0));
+  coeffs.push_back(T(offset,offset+1,0));
+
+  
+  coeffs.push_back(T(offset+1,offset-2,0));
+  coeffs.push_back(T(offset+1,offset-1,0));
+  coeffs.push_back(T(offset+1,offset,0));
+  coeffs.push_back(T(offset+1,offset+1,0));
+  
+  
+  for (int i = 1; i < Nbeads-1; i++) {
+    coeffs.push_back(T(i+offset,i+offset+1,0));
+    coeffs.push_back(T(i+offset+1,i+offset+1,0));
+    coeffs.push_back(T(i+offset+1,i+offset,0));
+
+
+  }
+
+  
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads,0));
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads+1,0));
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads+2,0));
+
+  
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads-1,0));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads,0));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads+1,0));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads+2,0));
+  
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads-1,0));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads,0));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+1,0));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+2,0));
+  
+  
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads-1,0));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads,0));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+1,0));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+2,0));
+
+  return coeffs;
+
+
+}
+
+
+
+
+
+
+
+void Polymer::update_const_part_dCdlambda(double Delta_t)
+{
+  // must update column-wise
+  int offset = 2;
+
+  Eigen::Vector3d B_mu, B_mup1;
+  Eigen::Vector3d S_1, S_2, S_3;
+
+  B_mup1 = atoms[1].friction*(atoms[1].Fpot + atoms[1].noise);
+  B_mu = atoms[0].friction*(atoms[0].Fpot + atoms[0].noise);
+
+  utilFuncs::calc_S_mu(S_2,B_mup1,B_mu,bonds[0].rod,bondlength);
+  
+
+  // negative two col
+  dCdlambda.coeffRef(offset-2,offset-2) = -Hhat_endblocks(0,0,0);
+  dCdlambda.coeffRef(offset-1,offset-2) = -Hhat_endblocks(1,0,0);
+  dCdlambda.coeffRef(offset,offset-2) = -Hhat_endblocks(2,0,0);
+
+  
+  dCdlambda.coeffRef(offset+1,offset-2) = (-Hhat_leftside(0)
+					   + Delta_t* (atoms[0].friction*utilFuncs::e_x).dot(S_2));
+
+
+  // n one col
+  dCdlambda.coeffRef(offset-2,offset-1) = -Hhat_endblocks(1,0,0);
+  dCdlambda.coeffRef(offset-1,offset-1) = -Hhat_endblocks(1,1,0);
+  dCdlambda.coeffRef(offset,offset-1) = -Hhat_endblocks(2,1,0);
+  dCdlambda.coeffRef(offset+1,offset-1) = (-Hhat_leftside(1)
+					   + Delta_t* (atoms[0].friction*utilFuncs::e_y).dot(S_2));
+
+
+  
+  // zero col
+  dCdlambda.coeffRef(offset-2,offset) = -Hhat_endblocks(2,0,0);
+  dCdlambda.coeffRef(offset-1,offset) = -Hhat_endblocks(2,1,0);
+  dCdlambda.coeffRef(offset,offset) = -Hhat_endblocks(2,2,0);
+  dCdlambda.coeffRef(offset+1,offset) = (-Hhat_leftside(2)
+  					 + Delta_t* (atoms[0].friction*utilFuncs::e_z).dot(S_2));
+
+
+
+  // one col
+  dCdlambda.coeffRef(offset-2,offset+1) = -Hhat_leftside(0);
+  dCdlambda.coeffRef(offset-1,offset+1) = -Hhat_leftside(1);
+  dCdlambda.coeffRef(offset,offset+1) = -Hhat_leftside(2);
+  dCdlambda.coeffRef(offset+1,offset+1) = (-Hhat_diag_val(0)
+  					   -Delta_t*((atoms[1].friction
+						      +atoms[0].friction)
+  						     *bonds[0].rod).dot(S_2));
+  B_mu = B_mup1;
+  B_mup1 = atoms[2].friction*(atoms[2].Fpot + atoms[2].noise);
+
+
+  utilFuncs::calc_S_mu(S_3,B_mup1,B_mu,bonds[1].rod,bondlength);
+
+  
+  dCdlambda.coeffRef(offset+2,offset+1)  = (-Hhat_loweroff_val(1)
+  					    +Delta_t*(atoms[1].friction*bonds[0].rod).dot(S_3));
+  
+
+  // update middle columns
+  for (int k = 1; k < Nbeads-2; k++) {
+
+    S_1 = S_2;
+    S_2 = S_3;
+
+    B_mu = B_mup1;
+    B_mup1 = atoms[k+2].friction*(atoms[k+2].Fpot + atoms[k+2].noise);
+
+    utilFuncs::calc_S_mu(S_3,B_mup1,B_mu,bonds[k+1].rod,bondlength);
+
+
+    int count = 0;
+    for (SpMat::InnerIterator it(dCdlambda,k+offset+1); it; ++it) {
+
+      if (count == 0) {
+    	it.valueRef() = (-Hhat_loweroff_val(k)
+			 +Delta_t*(atoms[k].friction*bonds[k].rod).dot(S_1));
+	
+      } else if (count == 1) {
+	
+	it.valueRef() = (-Hhat_diag_val(k)
+			 -Delta_t*((atoms[k+1].friction
+				    +atoms[k].friction)
+				   *bonds[k].rod).dot(S_2));
+	
+	
+      } else {
+
+	it.valueRef() = (-Hhat_loweroff_val(k+1)
+			 +Delta_t*(atoms[k+1].friction*bonds[k].rod).dot(S_3));
+      }
+
+      count += 1;
+    }
+  }
+
+
+  S_1 = S_2;
+  S_2 = S_3;
+
+  // Nbeads - 1 col
+  dCdlambda.coeffRef(offset+Nbeads-2, offset+Nbeads-1) = (- Hhat_loweroff_val(Nbeads-2)
+  							  +Delta_t*(atoms[Nbeads-2].friction
+  								    *bonds[Nbeads-2].rod).dot(S_1));
+  dCdlambda.coeffRef(offset+Nbeads-1, offset+Nbeads-1) = (- Hhat_diag_val(Nbeads-2)
+  							  - Delta_t*((atoms[Nbeads-1].friction
+  								      +atoms[Nbeads-2].friction)
+  								     *bonds[Nbeads-2].rod).dot(S_2));
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads-1) = -Hhat_bottomside(0);
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads-1) = -Hhat_bottomside(1);
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads-1) = -Hhat_bottomside(2);
+  
+  
+  
+  // Nbeads col
+  dCdlambda.coeffRef(offset+Nbeads-1,offset+Nbeads) = (-Hhat_bottomside(0)
+  						       -Delta_t*(atoms[Nbeads-1].friction
+  								 *utilFuncs::e_x).dot(S_2));
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads) = -Hhat_endblocks(0,0,Nbeads-1);
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads) = -Hhat_endblocks(1,0,Nbeads-1);
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads) = -Hhat_endblocks(2,0,Nbeads-1);
+  
+  
+  // Nbeads+1 col
+  dCdlambda.coeffRef(offset+Nbeads-1,offset+Nbeads+1) = (-Hhat_bottomside(1)
+  							 -Delta_t*(atoms[Nbeads-1].friction
+  								   *utilFuncs::e_y).dot(S_2));
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads+1) = -Hhat_endblocks(1,0,Nbeads-1);
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads+1) = -Hhat_endblocks(1,1,Nbeads-1);
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads+1) = -Hhat_endblocks(2,1,Nbeads-1);
+
+
+  // Nbeads +2 col
+  dCdlambda.coeffRef(offset+Nbeads-1,offset+Nbeads+2) = (-Hhat_bottomside(2)
+  							 -Delta_t*(atoms[Nbeads-1].friction
+  								   *utilFuncs::e_z).dot(S_2));
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads+2) = -Hhat_endblocks(2,0,Nbeads-1);
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads+2) = -Hhat_endblocks(2,1,Nbeads-1);
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads+2) = -Hhat_endblocks(2,2,Nbeads-1);
+
+  return;
+
+}
+
+
+void Polymer::compute_tmp_mat_dCdlambda(double Delta_t)
+{
+  // must update column-wise
+  int offset = 2;
+
+  Eigen::Vector3d B_mu, B_mup1;
+  Eigen::Vector3d S_1, S_2, S_3;
+
+  utilFuncs::calc_A_1(B_mu,bonds,atoms,tension);
+  utilFuncs::calc_A_i(B_mup1,bonds,atoms,tension,1);
+  utilFuncs::calc_S_mu(S_2,B_mup1,B_mu,bonds[0].rod,bondlength);
+
+  
+  // negative two col
+
+
+
+  mat_tmp.coeffRef(offset+1,offset-2) = -Delta_t* (atoms[0].friction*utilFuncs::e_x).dot(S_2);
+
+
+  // n one col
+
+  mat_tmp.coeffRef(offset+1,offset-1) = -Delta_t* (atoms[0].friction*utilFuncs::e_y).dot(S_2);
+
+
+  
+  // zero col
+
+  mat_tmp.coeffRef(offset+1,offset) =  -Delta_t* (atoms[0].friction*utilFuncs::e_z).dot(S_2);
+
+
+
+  // one col
+
+  mat_tmp.coeffRef(offset+1,offset+1) = Delta_t*((atoms[1].friction
+						  +atoms[0].friction)
+						 *bonds[0].rod).dot(S_2);
+
+
+  B_mu = B_mup1;
+  utilFuncs::calc_A_i(B_mup1,bonds,atoms,tension,2);
+
+  utilFuncs::calc_S_mu(S_3,B_mup1,B_mu,bonds[1].rod,bondlength);
+
+
+  mat_tmp.coeffRef(offset+2,offset+1)  = -Delta_t*(atoms[1].friction*bonds[0].rod).dot(S_3);
+
+
+
+
+  // update middle columns
+  for (int k = 1; k < Nbeads-2; k++) {
+
+    S_1 = S_2;
+    S_2 = S_3;
+
+    B_mu = B_mup1;
+    if (k == Nbeads - 3) {
+      utilFuncs::calc_A_N(B_mup1,bonds,atoms,tension);
+    } else {
+      utilFuncs::calc_A_i(B_mup1,bonds,atoms,tension,k+2);
+    }
+    
+
+    utilFuncs::calc_S_mu(S_3,B_mup1,B_mu,bonds[k+1].rod,bondlength);
+
+    
+    int count = 0;
+    for (SpMat::InnerIterator it(mat_tmp,k+offset+1); it; ++it) {
+      if (count == 0) {
+    	it.valueRef() = -Delta_t*(atoms[k].friction*bonds[k].rod).dot(S_1);
+	
+      } else if (count == 1) {
+	
+	it.valueRef() =  Delta_t*((atoms[k+1].friction
+				    +atoms[k].friction)
+				   *bonds[k].rod).dot(S_2);
+	
+	
+      } else {
+	
+	it.valueRef() = -Delta_t*(atoms[k+1].friction*bonds[k].rod).dot(S_3);
+      }
+
+      count += 1;
+    }
+  }
+
+
+  S_1 = S_2;
+  S_2 = S_3;
+
+  // Nbeads - 1 col
+  mat_tmp.coeffRef(offset+Nbeads-2, offset+Nbeads-1) = -Delta_t*(atoms[Nbeads-2].friction
+								*bonds[Nbeads-2].rod).dot(S_1);
+  mat_tmp.coeffRef(offset+Nbeads-1, offset+Nbeads-1) = Delta_t*((atoms[Nbeads-1].friction
+								 +atoms[Nbeads-2].friction)
+								*bonds[Nbeads-2].rod).dot(S_2);
+  
+  
+  
+  // Nbeads col
+  mat_tmp.coeffRef(offset+Nbeads-1,offset+Nbeads) = Delta_t*(atoms[Nbeads-1].friction
+							      *utilFuncs::e_x).dot(S_2);
+  
+  
+  // Nbeads+1 col
+  mat_tmp.coeffRef(offset+Nbeads-1,offset+Nbeads+1) = Delta_t*(atoms[Nbeads-1].friction
+								*utilFuncs::e_y).dot(S_2);
+
+
+  // Nbeads +2 col
+  mat_tmp.coeffRef(offset+Nbeads-1,offset+Nbeads+2) = Delta_t*(atoms[Nbeads-1].friction
+								*utilFuncs::e_z).dot(S_2);
+
+  return;
+
+}
+
+
 
 
 void Polymer::compute_noise()
@@ -825,24 +1370,119 @@ void Polymer::compute_noise()
 
 void Polymer::compute_tension(double t)
 {
-  set_rhs_of_Hhat(t);
-  Hhat_solver.factorize(Hhat);
 
+
+
+  set_rhs_of_Hhat(t);
+
+  Hhat_solver.factorize(Hhat);
   tension =  Hhat_solver.solve(rhs_of_Hhat);
   
 }
 
-void Polymer::correct_tension()
+void Polymer::test_jacob(int mu,double Delta_t,double t)
 {
-  set_rhs_constraints();
 
-  std::cout << "Constraint equations not satisfied, see here:"
-	    << rhs_constraints << std::endl;
-  Hhat_solver.factorize(Hhat);
-  tension_change = Hhat_solver.solve(rhs_constraints);
+  int offset = 2;  
+  // start by initializing the vector dC at whatever tensions
+  update_const_part_dC(Delta_t,t+Delta_t);
 
-  tension = tension-tension_change;
+  compute_tmp_for_dC(Delta_t);
+  rhs_of_Hhat += rhs_tmp;
 
+  update_const_part_dCdlambda(Delta_t);
+
+
+  compute_tmp_mat_dCdlambda(Delta_t);
+  dCdlambda += mat_tmp;
+
+
+  
+  std::cout << "exact calc: " << std::endl;
+  std::cout << dCdlambda.col(mu+offset) << std::endl;
+
+  dCdlambda -= mat_tmp;
+  
+  Eigen::VectorXd zeroval_change = rhs_of_Hhat;
+
+ 
+  double tens_change_old = 0;
+  for (double tens_change = 0.01; tens_change > 0.0001; tens_change /= 2) {
+
+    tension(mu+offset) -= tens_change_old;
+    tension(mu+offset) += tens_change;
+    
+    rhs_of_Hhat -= rhs_tmp;    
+    compute_tmp_for_dC(Delta_t);
+    rhs_of_Hhat += rhs_tmp;
+
+    std::cout << "numerical estimate with dlamda =  " << tens_change
+	      << "and lambda = " << tension(mu+offset) << " is = " << std::endl;
+    std::cout << (rhs_of_Hhat-zeroval_change)/tens_change << std::endl;
+
+    tens_change_old = tens_change;
+
+  }
+
+  rhs_of_Hhat -= rhs_tmp;
+  
+  return;
+}  
+
+void Polymer::correct_tension(double Delta_t,double t)
+{
+
+
+
+  compute_tmp_for_dC(Delta_t);
+  rhs_of_Hhat += rhs_tmp;
+
+  update_const_part_dCdlambda(Delta_t);
+  
+ 
+  // and then dC/dlambda
+  update_const_part_dCdlambda(Delta_t);
+
+  compute_tmp_mat_dCdlambda(Delta_t);
+  dCdlambda += mat_tmp;
+
+  
+  //and then solve
+
+  jacob_solver.factorize(dCdlambda);
+
+  negative_tension_change = jacob_solver.solve(rhs_of_Hhat);
+  
+  tension = tension - negative_tension_change;
+  for (int iter = 0; iter < 30; iter ++) { 
+
+    rhs_of_Hhat -= rhs_tmp;
+    compute_tmp_for_dC(Delta_t);
+    rhs_of_Hhat += rhs_tmp;
+
+    dCdlambda -= mat_tmp;
+    compute_tmp_mat_dCdlambda(Delta_t);
+    dCdlambda += mat_tmp;
+
+
+  
+    jacob_solver.factorize(dCdlambda);
+
+    negative_tension_change = jacob_solver.solve(rhs_of_Hhat);
+
+
+    tension = tension - negative_tension_change;
+  }
+
+  std::cout << "negative tension change = " << std::endl;
+  std::cout << negative_tension_change << std::endl;
+
+  std::cout << "dC = " << std::endl;
+  std::cout << rhs_of_Hhat << std::endl;
+
+
+
+  
 }
 
 
@@ -854,39 +1494,38 @@ void Polymer::initial_integrate(double Delta_t)
   
   Rtmp[0] = atoms[0].R;
 
-  atoms[0].F += tension(offset+1)*bonds[0].rod;
+  atoms[0].t_force = tension(offset+1)*bonds[0].rod;
 
-  atoms[0].F(0) -= tension(offset-2);
-  atoms[0].F(1) -= tension(offset-1);
-  atoms[0].F(2) -= tension(offset);
+  atoms[0].t_force(0) -= tension(offset-2);
+  atoms[0].t_force(1) -= tension(offset-1);
+  atoms[0].t_force(2) -= tension(offset);
 
-  atoms[0].R += tmp*atoms[0].friction*atoms[0].F;
+  atoms[0].R += tmp*atoms[0].friction*(atoms[0].Fpot+atoms[0].noise+atoms[0].t_force);
   
   for (int i = 1; i < Nbeads-1; i++) {
 
     Rtmp[i] = atoms[i].R;
 
+    atoms[i].t_force = tension(offset+1+i)*bonds[i].rod-tension(offset+i)*bonds[i-1].rod;
 
-    atoms[i].F += tension(offset+1+i)*bonds[i].rod-tension(offset+i)*bonds[i-1].rod;
 
+    atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
 
-    atoms[i].R += tmp*atoms[i].friction*atoms[i].F;
   }
 
   int i = Nbeads -1;
 
   Rtmp[i] = atoms[i].R;
-  
-  atoms[i].F += -tension(offset+i)*bonds[i-1].rod;
 
-  atoms[i].F(0) -= tension(offset+Nbeads);
-  atoms[i].F(1) -= tension(offset+Nbeads+1);
-  atoms[i].F(2) -= tension(offset+Nbeads+2);
+  atoms[i].t_force = -tension(offset+i)*bonds[i-1].rod;
+
+  atoms[i].t_force(0) -= tension(offset+Nbeads);
+  atoms[i].t_force(1) -= tension(offset+Nbeads+1);
+  atoms[i].t_force(2) -= tension(offset+Nbeads+2);
 
 
-  atoms[i].R += tmp*atoms[i].friction*atoms[i].F;  
+  atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);  
 
-  
   return;
 }
 
@@ -898,61 +1537,141 @@ void Polymer::final_integrate(double Delta_t)
 
   int offset=2;
 
-  
-  atoms[0].F += tension(offset+1)*bonds[0].rod;
 
-  atoms[0].F(0) -= tension(offset-2);
-  atoms[0].F(1) -= tension(offset-1);
-  atoms[0].F(2) -= tension(offset);
+  atoms[0].t_force= tension(offset+1)*bonds[0].rod;
+
+  atoms[0].t_force(0) -= tension(offset-2);
+  atoms[0].t_force(1) -= tension(offset-1);
+  atoms[0].t_force(2) -= tension(offset);
   
 
-  atoms[0].R = Rtmp[0] + tmp*atoms[0].friction*atoms[0].F;
+  atoms[0].R = Rtmp[0] + tmp*atoms[0].friction*(atoms[0].Fpot+atoms[0].noise+atoms[0].t_force);
 
 
     
   for (int i = 1; i < Nbeads-1; i++) {
 
-    atoms[i].F += tension(offset+1+i)*bonds[i].rod-tension(offset+i)*bonds[i-1].rod;
+    atoms[i].t_force = tension(offset+1+i)*bonds[i].rod-tension(offset+i)*bonds[i-1].rod;
 
+    atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
 
-    atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*atoms[i].F;
-
-    
     
   }
 
   int i = Nbeads -1;
 
-  atoms[i].F += -tension(offset+i)*bonds[i-1].rod;
+  atoms[i].t_force = -tension(offset+i)*bonds[i-1].rod;
 
-  atoms[i].F(0) -= tension(offset+Nbeads);
-  atoms[i].F(1) -= tension(offset+Nbeads+1);
-  atoms[i].F(2) -= tension(offset+Nbeads+2);
+  atoms[i].t_force(0) -= tension(offset+Nbeads);
+  atoms[i].t_force(1) -= tension(offset+Nbeads+1);
+  atoms[i].t_force(2) -= tension(offset+Nbeads+2);
 
-  atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*atoms[i].F;
+  atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
 
-
-  
   return;
 }
 
-void Polymer::set_rhs_constraints()
+
+void Polymer::single_inv_friction(int i)
+{
+  double tmp = 1./zpara-1./zperp;
+  atoms[i].friction = tmp*atoms[i].tangent*atoms[i].tangent.transpose();
+  
+  for (int j = 0; j < 3; j++ )
+
+    atoms[i].friction(j,j) += 1./zperp;
+
+  return;
+
+}
+
+
+
+double Polymer::Hhat_diag_val(int mu)
+{
+
+
+  double tmp1 = atoms[mu].tangent.dot(bonds[mu].rod);
+  tmp1 = tmp1*tmp1;
+
+
+  double tmp2 =  atoms[mu+1].tangent.dot(bonds[mu].rod);
+  tmp2 = tmp2*tmp2;
+
+
+  return 2./zperp + (1./zpara-1./zperp)*(tmp1+tmp2);
+
+}
+
+/* NOte that there is a typo in the paper I'm basing this off of
+   (Montesi et al, 2005) , which is why there is a difference between
+   my off-diagonal H values and theirs. In their equation 34, anywhere
+   there is a mu+1, it should be a mu-1. */
+double Polymer::Hhat_loweroff_val(int mu)
+{
+
+  double tmp1 = bonds[mu-1].rod.dot(bonds[mu].rod);
+  double tmp2 = bonds[mu-1].rod.dot(atoms[mu].tangent);
+  double tmp3 = atoms[mu].tangent.dot(bonds[mu].rod);
+
+  return -1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3;
+
+}
+
+double Polymer::Hhat_endblocks(int first, int second,int mu)
+{
+  double extra = 0;
+
+  if (first == second) extra = 1;
+  
+  return (extra/zperp + (1./zpara-1./zperp)*atoms[mu].tangent(first)
+	  *atoms[mu].tangent(second));
+
+}
+
+
+double Polymer::Hhat_leftside(int first)
+{
+
+  double tmp =  atoms[0].tangent.dot(bonds[0].rod)*atoms[0].tangent(first);
+
+  
+  return -1*(1./zpara-1./zperp)*tmp - bonds[0].rod(first)/zperp;
+
+}
+
+double Polymer::Hhat_bottomside(int first)
+{
+  
+  double tmp =  atoms[Nbeads-1].tangent.dot(bonds[Nbeads-2].rod)*atoms[Nbeads-1].tangent(first);
+  
+  
+  return (1./zpara-1./zperp)*tmp + bonds[Nbeads-2].rod(first)/zperp;
+  
+}
+
+
+
+
+
+
+void Polymer::calculate_constraint_errors()
 {
   int offset = 2;
-  rhs_constraints(offset-2) = atoms[0].R(0)-x0(0);
-  rhs_constraints(offset-1) = atoms[0].R(1)-x0(1);
-  rhs_constraints(offset) = atoms[0].R(2)-x0(2);
+  constraint_errors(offset-2) = atoms[0].R(0)-x0(0);
+  constraint_errors(offset-1) = atoms[0].R(1)-x0(1);
+  constraint_errors(offset) = atoms[0].R(2)-x0(2);
   for (int mu = 1; mu < Nbeads; mu++) {
-    rhs_constraints(offset+mu) = (atoms[mu].R-atoms[mu-1].R).norm()-bondlength;
+    constraint_errors(offset+mu) = (atoms[mu].R-atoms[mu-1].R).norm()-bondlength;
   }
 
-  rhs_constraints(offset+Nbeads) = atoms[Nbeads-1].R(0)-xN(0);
-  rhs_constraints(offset+Nbeads+1) = atoms[Nbeads-1].R(1)-xN(1);
-  rhs_constraints(offset+Nbeads+2) = atoms[Nbeads-1].R(2)-xN(2);
+  constraint_errors(offset+Nbeads) = atoms[Nbeads-1].R(0)-xN(0);
+  constraint_errors(offset+Nbeads+1) = atoms[Nbeads-1].R(1)-xN(1);
+  constraint_errors(offset+Nbeads+2) = atoms[Nbeads-1].R(2)-xN(2);
   return;
 
 }
-  
+
 
 void Polymer::rescale_positions(bool fromfront)
 {
@@ -1000,3 +1719,376 @@ double Polymer::get_timescale(double dt) const
 {
   return dt*temp/(bondlength*zperp);
 }
+
+
+
+
+/*
+void Polymer::compute_rhs_constraintfix(int iteration,double Delta_t,double t)
+{
+
+  int offset = 2;
+  Eigen::Vector3d tmp;
+
+
+
+  
+  if (iteration == 0) {
+    
+    tmp = atoms[0].friction*atoms[0].noise;
+
+    rhs_of_Hhat(-2+offset) = tmp(0);
+    rhs_of_Hhat(-1+offset) = tmp(1);
+    rhs_of_Hhat(offset) = tmp(2);
+    
+    for (int mu = 1; mu < Nbeads; mu++) {
+      rhs_of_Hhat(mu+offset) = bonds[mu-1].rod.dot(atoms[mu].friction*atoms[mu].noise
+						   -atoms[mu-1].friction*atoms[mu-1].noise);
+
+    }
+    tmp = atoms[Nbeads-1].friction*atoms[Nbeads-1].noise;
+    
+    rhs_of_Hhat(Nbeads+offset) = tmp(0);
+    rhs_of_Hhat(Nbeads+1+offset) = tmp(1);
+    rhs_of_Hhat(Nbeads+2+offset) = tmp(2);
+
+    
+  } else if (iteration == 1) {
+    
+    Eigen::Vector3d A_mu;
+    Eigen::Vector3d A_mu_p1;
+    Eigen::Vector3d B_mu;
+    Eigen::Vector3d B_mu_p1;
+    
+    tmp = atoms[0].friction*atoms[0].Fpot;
+    rhs_of_Hhat(-2+offset) = tmp(0)+rad*omega*sin(omega*t);
+    rhs_of_Hhat(-1+offset) = tmp(1)-rad*omega*cos(omega*t);
+    rhs_of_Hhat(offset) = tmp(2);
+
+    int mu = 1;
+
+
+    rhs_of_Hhat(mu+offset) = bonds[mu-1].rod.dot(atoms[mu].friction*atoms[mu].Fpot
+						 -atoms[mu-1].friction*atoms[mu-1].Fpot);
+    
+
+
+    A_mu = atoms[mu-1].friction*atoms[mu-1].noise;    
+    A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    B_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				  -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+
+    
+    compute_rhs_helper(A_mu,A_mu_p1,A_mu,A_mu_p1,0.5,Delta_t,mu,offset);
+
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+    compute_rhs_helper(B_mu,B_mu_p1,B_mu,B_mu_p1,0.5,Delta_t,mu,offset);
+
+    
+    for (mu = 2; mu < Nbeads-1; mu++) {
+      
+
+
+      rhs_of_Hhat(mu+offset) = bonds[mu-1].rod.dot(atoms[mu].friction*atoms[mu].Fpot
+						   -atoms[mu-1].friction*atoms[mu-1].Fpot);
+
+
+      A_mu = atoms[mu-1].friction*atoms[mu-1].noise;      
+      A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+      B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+      B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+      compute_rhs_helper(A_mu,A_mu_p1,A_mu,A_mu_p1,0.5,Delta_t,mu,offset);
+      
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+      compute_rhs_helper(B_mu,B_mu_p1,B_mu,B_mu_p1,0.5,Delta_t,mu,offset);
+
+    }
+
+    mu = Nbeads-1;
+
+    rhs_of_Hhat(mu+offset) = bonds[mu-1].rod.dot(atoms[mu].friction*atoms[mu].Fpot
+						 -atoms[mu-1].friction*atoms[mu-1].Fpot);
+
+    A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				    -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));    
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+
+    compute_rhs_helper(A_mu,A_mu_p1,A_mu,A_mu_p1,0.5,Delta_t,mu,offset);
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+    compute_rhs_helper(B_mu,B_mu_p1,B_mu,B_mu_p1,0.5,Delta_t,mu,offset);
+
+
+    tmp = atoms[Nbeads-1].friction*atoms[Nbeads-1].Fpot;
+    
+    rhs_of_Hhat(Nbeads+offset) = tmp(0);
+    rhs_of_Hhat(Nbeads+1+offset) = tmp(1);
+    rhs_of_Hhat(Nbeads+2+offset) = tmp(2);
+
+
+    
+  } else if (iteration == 2) {
+        
+    Eigen::Vector3d A_mu;
+    Eigen::Vector3d A_mu_p1;
+    Eigen::Vector3d B_mu;
+    Eigen::Vector3d B_mu_p1;
+
+    
+    rhs_of_Hhat(-2+offset) = 0.0;
+    rhs_of_Hhat(-1+offset) = 0.0;
+    rhs_of_Hhat(offset) = 0.0;
+
+    
+
+    int mu = 1;
+    rhs_of_Hhat(mu+offset) = 0.0;
+    
+
+
+    A_mu = atoms[mu-1].friction*atoms[mu-1].Fpot;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].Fpot;
+    B_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    B_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+
+
+
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1.0,Delta_t,mu,offset);
+
+    B_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+
+    A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    B_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-2)(mu+1+offset));    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+    A_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    A_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));    
+
+
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1,Delta_t,mu,offset);
+
+    
+    for (mu = 2; mu < Nbeads-1; mu++) {
+      rhs_of_Hhat(mu+offset) = 0.0;
+      
+      A_mu = atoms[mu-1].friction*atoms[mu-1].Fpot;
+      A_mu_p1 = atoms[mu].friction*atoms[mu].Fpot;
+      B_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+      B_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+      
+      
+      
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1.0,Delta_t,mu,offset);
+      B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+      B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+      
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+      
+      A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+      A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+      B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-2)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));
+      B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-2)(mu+1+offset));
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+      A_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+      A_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1,Delta_t,mu,offset);
+    }
+    
+    mu = Nbeads-1;
+    
+
+    
+    rhs_of_Hhat(mu+offset) = 0.0;
+    
+    A_mu = atoms[mu-1].friction*atoms[mu-1].Fpot;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].Fpot;
+    B_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    B_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    
+    
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1.0,Delta_t,mu,offset);
+    
+    B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				 -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));    
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+    
+    A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-2)(mu-1+offset)
+				 -bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));    
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+    
+
+    A_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				 -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));    
+    A_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1,Delta_t,mu,offset);
+    
+    rhs_of_Hhat(Nbeads+offset) = 0.0;
+    rhs_of_Hhat(Nbeads+1+offset) = 0.0;
+    rhs_of_Hhat(Nbeads+2+offset) = 0.0;
+    
+  }  else if (iteration == 3) {
+        
+    Eigen::Vector3d A_mu;
+    Eigen::Vector3d A_mu_p1;
+    Eigen::Vector3d B_mu;
+    Eigen::Vector3d B_mu_p1;
+
+    
+    rhs_of_Hhat(-2+offset) = 0.5*rad*omega*omega*cos(omega*t)*Delta_t;
+    rhs_of_Hhat(-1+offset) = 0.5*rad*omega*omega*sin(omega*t)*Delta_t;
+    rhs_of_Hhat(offset) = 0.0;
+
+    
+
+    int mu = 1;
+    rhs_of_Hhat(mu+offset) = 0.0;
+    
+
+
+    A_mu = atoms[mu-1].friction*atoms[mu-1].Fpot;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].Fpot;
+    B_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    B_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+
+
+
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1.0,Delta_t,mu,offset);
+
+    B_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+
+    A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    B_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-2)(mu+1+offset));    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+    A_mu = atoms[mu-1].friction*(-bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    A_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));    
+
+
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1,Delta_t,mu,offset);
+
+    
+    for (mu = 2; mu < Nbeads-1; mu++) {
+      rhs_of_Hhat(mu+offset) = 0.0;
+      
+      A_mu = atoms[mu-1].friction*atoms[mu-1].Fpot;
+      A_mu_p1 = atoms[mu].friction*atoms[mu].Fpot;
+      B_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+      B_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+      
+      
+      
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1.0,Delta_t,mu,offset);
+      B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+      B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+      
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+      
+      A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+      A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+      B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-2)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));
+      B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-2)(mu+1+offset));
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+      A_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				   -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+      A_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset)
+				    -bonds[mu].rod*tension_corrections.at(iteration-1)(mu+1+offset));
+
+      compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1,Delta_t,mu,offset);
+    }
+    
+    mu = Nbeads-1;
+    
+
+    
+    rhs_of_Hhat(mu+offset) = 0.0;
+    
+    A_mu = atoms[mu-1].friction*atoms[mu-1].Fpot;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].Fpot;
+    B_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    B_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    
+    
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1.0,Delta_t,mu,offset);
+    
+    B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				 -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));    
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+
+    
+    A_mu = atoms[mu-1].friction*atoms[mu-1].noise;
+    A_mu_p1 = atoms[mu].friction*atoms[mu].noise;
+    B_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-2)(mu-1+offset)
+				 -bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));    
+    B_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-2)(mu+offset));    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,-1,Delta_t,mu,offset);
+    
+
+    A_mu = atoms[mu-1].friction*(bonds[mu-2].rod*tension_corrections.at(iteration-1)(mu-1+offset)
+				 -bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));    
+    A_mu_p1 = atoms[mu].friction*(bonds[mu-1].rod*tension_corrections.at(iteration-1)(mu+offset));
+    
+    compute_rhs_helper(A_mu,A_mu_p1,B_mu,B_mu_p1,1,Delta_t,mu,offset);
+    
+    rhs_of_Hhat(Nbeads+offset) = 0.0;
+    rhs_of_Hhat(Nbeads+1+offset) = 0.0;
+    rhs_of_Hhat(Nbeads+2+offset) = 0.0;
+    
+  }
+
+  
+
+  return;
+
+  
+}
+
+*/
+

@@ -96,7 +96,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   for (int mu = 0; mu < N -1; mu++ ) {
     double sum = 0;
     for (int j = 0; j < N; j++) {
-      sum += boldn(j,mu).dot(pmer.atoms[j].friction*pmer.atoms[j].F);
+      sum += boldn(j,mu).dot(pmer.atoms[j].friction*pmer.atoms[j].Fpot);
     }
     std::cout << "Bond " << mu << ": " << pmer.rhs_of_Hhat(mu) - sum
 	      << std::endl;
@@ -114,7 +114,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   for (int i = 0; i < N; i++) {
     Rdots[i].setZero();
     for (int j = 0; j < N; j++) {
-      Rdots[i] += projection(i,j)*pmer.atoms[j].friction*pmer.atoms[j].F;
+      Rdots[i] += projection(i,j)*pmer.atoms[j].friction*pmer.atoms[j].Fpot;
     }
   }
   
