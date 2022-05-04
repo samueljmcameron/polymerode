@@ -25,9 +25,6 @@ public:
   
   std::vector<Eigen::Vector3d> Rtmp;    // temporary storate for midstep
 
-
-  
-
   
   Eigen::VectorXd dummy_for_noise, tension,negative_tension_change;
   Eigen::VectorXd constraint_errors;
@@ -36,7 +33,7 @@ public:
   void rescale_positions(bool);
 
   virtual void init_atoms();
-  void compute_tangents_and_rods_and_friction();
+  void compute_tangents_and_friction();
 
   void set_unprojected_noise(double);
 
@@ -63,24 +60,23 @@ public:
 
 
 
-  void update_const_part_dC(double, double);
+
   
   Eigen::VectorXd rhs_tmp;  // temp vector for updating dC
-  void compute_tmp_for_dC(double);
+
 
   SpMat dCdlambda; // matrix for storing Jacobian of dC=0 Newton solver
   SpMat mat_tmp;  // temporary matrix for storing parts of dCdlambda which change upon iteration
   void set_dCdlambda();
-  void update_const_part_dCdlambda(double);
-  void compute_tmp_mat_dCdlambda(double);
+  void update_dCdlambda(double);
 
 
 
-  void correct_tension(double,double);
-  void compute_rhs_constraintfix(int ,double ,double);
+  void correct_tension(double,double,  double tol = 1e-14);
+
 
   std::vector<Atom> atoms;
-  std::vector<Bond> bonds;
+  std::vector<Bond> bonds,tmpbonds;
 
 
 
@@ -93,8 +89,8 @@ public:
   void initial_integrate(double);
   void final_integrate(double);
 
-  void calculate_constraint_errors();  
-  void modify_rhs_Hhat(int , double, double);
+  void calculate_constraint_errors(double);  
+
 
   
   int get_Nbeads() const;
@@ -139,14 +135,20 @@ private:
   std::vector<T> init_Hhat_coeffsmatrix();  
 
   std::vector<T> init_dCdlambda_coeffsmatrix();
-  std::vector<T> init_tmp_mat_coeffsmatrix();
+
   
   double Hhat_diag_val(int);
+  double dCdlambda_diag_val(int);
+  
   double Hhat_loweroff_val(int);
+  double dCdlambda_loweroff_val(int);
+  double dCdlambda_upperoff_val(int);
 
   double Hhat_endblocks(int,int,int);
   double Hhat_leftside(int);
+  double dCdlambda_leftside(int);
   double Hhat_bottomside(int);
+  double dCdlambda_bottomside(int);
 
 
 

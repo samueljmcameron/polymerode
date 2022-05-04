@@ -15,7 +15,7 @@ void run(GlobalParams& gp, Polymer& pmer)
 
   double t = 0;
 
-  pmer.compute_tangents_and_rods_and_friction();
+
 
   Eigen::Vector3d startpoint(pmer.atoms[0].R);
   Eigen::Vector3d endpoint(pmer.atoms[pmer.get_Nbeads()-1].R);
@@ -31,9 +31,10 @@ void run(GlobalParams& gp, Polymer& pmer)
   ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
+  pmer.compute_tangents_and_friction();
+  
   pmer.set_Hhat();
   pmer.set_dCdlambda();
-  int max_iters = 1;
 
 
   // first half step
@@ -42,31 +43,18 @@ void run(GlobalParams& gp, Polymer& pmer)
   pmer.compute_noise();
   pmer.compute_uc_forces();
   pmer.compute_tension(t+dt/2);
-  pmer.initial_integrate(dt);
-  
-  pmer.compute_tangents_and_rods_and_friction();
+  pmer.initial_integrate(dt); // update beads, bonds, tangents, and frictions
   
   pmer.update_Hhat();
   pmer.compute_uc_forces();
   pmer.compute_tension(t+dt);
+   // compute final beads and bonds (not tangents or frictions).
+  pmer.correct_tension(dt,t+dt,1e-8);
 
-  pmer.correct_tension(dt,t);
-
-  
   pmer.final_integrate(dt);
-  pmer.calculate_constraint_errors();
 
-
-
-  std::cout << "Constraints are different than zero: " << std::endl;
-  std::cout << pmer.constraint_errors << std::endl;
-
-  std::cout << "Polymer lengths = " << std::endl;
-  for (int mu = 0; mu < pmer.get_Nbeads() -1; mu++) {
-    std::cout << (pmer.atoms[mu+1].R-pmer.atoms[mu].R).norm() << std::endl;
-  }
   
-  pmer.compute_tangents_and_rods_and_friction();
+  pmer.compute_tangents_and_friction();
   t += dt;
 
   if (dump_every == 1) {
@@ -82,7 +70,7 @@ void run(GlobalParams& gp, Polymer& pmer)
   }
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
-    
+    std::cout << "t = " << t << std::endl;
 
     pmer.set_unprojected_noise(dt);
     pmer.update_G();
@@ -92,23 +80,16 @@ void run(GlobalParams& gp, Polymer& pmer)
     pmer.compute_tension(t+dt/2);
     pmer.initial_integrate(dt);
     
-    pmer.compute_tangents_and_rods_and_friction();
     
     pmer.update_Hhat();
     pmer.compute_uc_forces();
-    //    pmer.correct_tension(0,dt,t+dt);
-    //    pmer.correct_tension(1,dt,t+dt);
     pmer.compute_tension(t+dt);
-    pmer.final_integrate(dt);
-    pmer.calculate_constraint_errors();
-    std::cout << "Constraints are different than zero: " << std::endl;
-    std::cout << pmer.constraint_errors << std::endl;
+    pmer.correct_tension(dt,t+dt,1e-8);
+    //    pmer.correct_tension(1,dt,t+dt);
 
-    std::cout << "Polymer lengths = " << std::endl;
-    for (int mu = 0; mu < pmer.get_Nbeads() -1; mu++) {
-      std::cout << (pmer.atoms[mu+1].R-pmer.atoms[mu].R).norm() << std::endl;
-    }    
-    pmer.compute_tangents_and_rods_and_friction();  
+    pmer.final_integrate(dt);
+
+    pmer.compute_tangents_and_friction();  
     t += dt;
 
     if (i % dump_every == 0) {
@@ -117,6 +98,16 @@ void run(GlobalParams& gp, Polymer& pmer)
       ioVTK::writeVTKPolyData(fname,pmer);
 
       ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+      //      std::cout << "Constraints are different than zero: " << std::endl;
+      //      std::cout << pmer.constraint_errors << std::endl;
+      
+      //      std::cout << "Polymer lengths = " << std::endl;
+      //      for (int mu = 0; mu < pmer.get_Nbeads() -1; mu++) {
+      //	std::cout << (pmer.atoms[mu+1].R-pmer.atoms[mu].R).norm() << std::endl;
+      //      }    
+      
+      
     }
       
   }
@@ -142,6 +133,9 @@ void run(GlobalParams& gp, Polymer& pmer)
   
   //  std::cout << "difference in end position = "
   //	    << pmer.atoms[pmer.get_Nbeads()-1].R-endpoint << std::endl;
+  
+  std::cout << "Constraints are different than zero: " << std::endl;
+  std::cout << pmer.constraint_errors << std::endl;
   
 
   return;

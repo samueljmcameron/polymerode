@@ -10,7 +10,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   int N = pmer.get_Nbeads();
   double dt = gp.timestep;
 
-  pmer.compute_tangents_and_rods_and_friction();
+  pmer.compute_tangents_and_friction();
 
   TestClass test(pmer.atoms,pmer.bonds);
 
@@ -142,7 +142,7 @@ void test_noise(GlobalParams &gp, Polymer &pmer)
   std::cout << pmer.get_timescale(dt) << std::endl;
 
 
-  pmer.compute_tangents_and_rods_and_friction();
+  pmer.compute_tangents_and_friction();
 
   test.atoms = pmer.atoms;
   test.bonds = pmer.bonds;
