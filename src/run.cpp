@@ -4,7 +4,78 @@
 #include <iostream>
 
 
-void run(GlobalParams& gp, Polymer& pmer)
+struct atEnd
+{
+  Eigen::Vector3d X_of_t;
+  Eigen::Vector3d dXdt;
+
+};
+
+void update_bead1(atEnd & bead1,const Eigen::Vector3d &x0,double t)
+{
+
+  double omega = 100;
+  double rad = 0.1;
+  bead1.X_of_t(0) = x0(0) + rad*(cos(omega*t)-1);
+  bead1.X_of_t(1) = x0(1) + rad*sin(omega*t);
+  bead1.X_of_t(2) = x0(2);
+
+  bead1.dXdt(0) = -rad*omega*sin(omega*t);
+  bead1.dXdt(1) = rad*omega*cos(omega*t);
+  bead1.dXdt(2) = 0;
+
+  return;
+  
+}
+
+void update_beadN(atEnd & beadN,const Eigen::Vector3d &xN,double t)
+{
+  beadN.X_of_t = xN;
+  beadN.dXdt.setZero();
+}
+
+
+
+void single_step(double & t,DoubleTether & pmer,atEnd & bead1,
+		 atEnd & beadN,const Eigen::Vector3d &x0,
+		 const Eigen::Vector3d &xN,double dt)
+{
+  pmer.set_unprojected_noise(dt);
+  pmer.update_G();
+  pmer.update_Hhat();
+  pmer.compute_noise();
+  pmer.compute_effective_kappa();
+  pmer.compute_uc_forces();
+  
+  update_bead1(bead1,x0,t+dt/2);
+  update_beadN(beadN,xN,t+dt/2);
+
+  
+  pmer.compute_tension(bead1.dXdt,beadN.dXdt);
+  pmer.initial_integrate(dt);
+  
+
+  
+  pmer.update_Hhat();
+  pmer.compute_effective_kappa();
+  pmer.compute_uc_forces();
+  
+  update_bead1(bead1,x0,t+dt);
+  update_beadN(beadN,xN,t+dt);
+  
+  pmer.compute_tension(bead1.dXdt,beadN.dXdt);
+  pmer.correct_tension(dt,bead1.X_of_t,beadN.X_of_t,1e-8);
+  pmer.final_integrate(dt);
+  
+  pmer.compute_tangents_and_friction();
+  t += dt;
+  return;
+}
+
+
+
+
+void run(GlobalParams& gp, DoubleTether& pmer)
 {
 
   int numsteps = gp.steps;
@@ -15,10 +86,11 @@ void run(GlobalParams& gp, Polymer& pmer)
 
   double t = 0;
 
-
-
   Eigen::Vector3d startpoint(pmer.atoms[0].R);
   Eigen::Vector3d endpoint(pmer.atoms[pmer.get_Nbeads()-1].R);
+
+
+  atEnd bead1,beadN;
   
   // save at time t = 0 always.
 
@@ -35,30 +107,11 @@ void run(GlobalParams& gp, Polymer& pmer)
   
   pmer.set_Hhat();
   pmer.set_dCdlambda();
-
-
-  // first half step
-  pmer.set_unprojected_noise(dt);
   pmer.set_G();
-  pmer.compute_noise();
-  pmer.compute_uc_forces();
-  pmer.compute_tension(t+dt/2);
-  pmer.initial_integrate(dt); // update beads, bonds, tangents, and frictions
   
-  pmer.update_Hhat();
-  pmer.compute_uc_forces();
-  pmer.compute_tension(t+dt);
-   // compute final beads and bonds (not tangents or frictions).
-  pmer.correct_tension(dt,t+dt,1e-8);
-
-  pmer.final_integrate(dt);
-
-  
-  pmer.compute_tangents_and_friction();
-  t += dt;
+  single_step(t,pmer,bead1,beadN,startpoint,endpoint,dt);
 
   if (dump_every == 1) {
-
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
@@ -68,45 +121,19 @@ void run(GlobalParams& gp, Polymer& pmer)
 
 
   }
+
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
     std::cout << "t = " << t << std::endl;
 
-    pmer.set_unprojected_noise(dt);
-    pmer.update_G();
-    pmer.update_Hhat();
-    pmer.compute_noise();
-    pmer.compute_uc_forces();
-    pmer.compute_tension(t+dt/2);
-    pmer.initial_integrate(dt);
+    single_step(t,pmer,bead1,beadN,startpoint,endpoint,dt);
     
-    
-    pmer.update_Hhat();
-    pmer.compute_uc_forces();
-    pmer.compute_tension(t+dt);
-    pmer.correct_tension(dt,t+dt,1e-8);
-    //    pmer.correct_tension(1,dt,t+dt);
-
-    pmer.final_integrate(dt);
-
-    pmer.compute_tangents_and_friction();  
-    t += dt;
-
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
       ioVTK::writeVTKPolyData(fname,pmer);
 
       ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
-
-      //      std::cout << "Constraints are different than zero: " << std::endl;
-      //      std::cout << pmer.constraint_errors << std::endl;
-      
-      //      std::cout << "Polymer lengths = " << std::endl;
-      //      for (int mu = 0; mu < pmer.get_Nbeads() -1; mu++) {
-      //	std::cout << (pmer.atoms[mu+1].R-pmer.atoms[mu].R).norm() << std::endl;
-      //      }    
-      
       
     }
       
@@ -114,26 +141,217 @@ void run(GlobalParams& gp, Polymer& pmer)
 
 
   ioVTK::writeVTKcollectionFooter(collection_name);
+
+  std::cout << "Constraints are different than zero: " << std::endl;
+  std::cout << pmer.constraint_errors << std::endl;
   
-  double norm;
 
-  double omega = 100.0;
-  double rad = 0.1;
+  return;
+}
 
-  startpoint(0) += rad*(cos(omega*t)-1);
-  startpoint(1) += rad*sin(omega*t);
+
+void single_step(double & t,SingleTether & pmer,atEnd & bead1,
+		 const Eigen::Vector3d &x0,double dt)
+{
+  pmer.set_unprojected_noise(dt);
+  pmer.update_G();
+  pmer.update_Hhat();
+  pmer.compute_noise();
+  pmer.compute_effective_kappa();
+  pmer.compute_uc_forces();
+  
+  update_bead1(bead1,x0,t+dt/2);
+  
+  pmer.compute_tension(bead1.dXdt);
+  pmer.initial_integrate(dt);
+  
 
   
-  //  std::cout << "difference in start position = " << pmer.atoms[0].R-startpoint << std::endl;
-  //  for (int mu = 0; mu < pmer.get_Nbeads()-1; mu++) {
-  //    norm = (pmer.atoms[mu+1].R-pmer.atoms[mu].R).norm();
+  pmer.update_Hhat();
+  pmer.compute_effective_kappa();
+  pmer.compute_uc_forces();
+  
+  update_bead1(bead1,x0,t+dt);
+
+  
+  pmer.compute_tension(bead1.dXdt);
+  pmer.correct_tension(dt,bead1.X_of_t,1e-8);
+  pmer.final_integrate(dt);
+  
+  pmer.compute_tangents_and_friction();
+  t += dt;
+  return;
+}
+
+
+void run(GlobalParams& gp, SingleTether& pmer)
+{
+
+  int numsteps = gp.steps;
+
+  double dt = gp.timestep;
+
+  int dump_every = gp.dump_every;
+
+  double t = 0;
+
+  Eigen::Vector3d startpoint(pmer.atoms[0].R);
+
+
+  atEnd bead1;
+  
+  // save at time t = 0 always.
+
+  std::string collection_name = gp.dump_file + std::string(".pvd");
+  ioVTK::writeVTKcollectionHeader(collection_name);
+
+  
+  std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
+  ioVTK::writeVTKPolyData(fname,pmer);
+  ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+
+  pmer.compute_tangents_and_friction();
+  
+  pmer.set_Hhat();
+  pmer.set_dCdlambda();
+  pmer.set_G();
+  single_step(t,pmer,bead1,startpoint,dt);  
+
+  if (dump_every == 1) {
+
+    fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
+  
+    ioVTK::writeVTKPolyData(fname,pmer);
+
+    ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+
+  }
+
+  // continue the remaining numstep - 2 steps
+  for (int i = 2; i <= numsteps; i++) {
+    std::cout << "t = " << t << std::endl;
     
-  //    std::cout << "mu = " << mu << ", |u_mu|/a = " << norm/pmer.get_bondlength() << std::endl;
-  //  }
+    single_step(t,pmer,bead1,startpoint,dt);  
+
+    if (i % dump_every == 0) {
+      fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-  //  std::cout << "difference in end position = "
-  //	    << pmer.atoms[pmer.get_Nbeads()-1].R-endpoint << std::endl;
+      ioVTK::writeVTKPolyData(fname,pmer);
+
+      ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+      
+    }
+      
+  }
+
+
+  ioVTK::writeVTKcollectionFooter(collection_name);
+
+  std::cout << "Constraints are different than zero: " << std::endl;
+  std::cout << pmer.constraint_errors << std::endl;
   
+
+  return;
+}
+
+
+void single_step(double & t, NoTether & pmer,double dt)
+{
+  pmer.set_unprojected_noise(dt);
+  pmer.update_G();
+  pmer.update_Hhat();
+  pmer.compute_noise();
+  pmer.compute_effective_kappa();
+  pmer.compute_uc_forces();
+  
+
+  
+  pmer.compute_tension();
+  pmer.initial_integrate(dt);
+  
+
+  
+  pmer.update_Hhat();
+  pmer.compute_effective_kappa();
+  pmer.compute_uc_forces();
+ 
+
+  
+  pmer.compute_tension();
+  pmer.correct_tension(dt,1e-8);
+  pmer.final_integrate(dt);
+  
+  pmer.compute_tangents_and_friction();
+  t += dt;
+  return;
+}
+
+
+void run(GlobalParams& gp, NoTether& pmer)
+{
+
+  int numsteps = gp.steps;
+
+  double dt = gp.timestep;
+
+  int dump_every = gp.dump_every;
+
+  double t = 0;
+
+
+  atEnd bead1;
+  
+  // save at time t = 0 always.
+
+  std::string collection_name = gp.dump_file + std::string(".pvd");
+  ioVTK::writeVTKcollectionHeader(collection_name);
+
+  
+  std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
+  ioVTK::writeVTKPolyData(fname,pmer);
+  ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+
+  pmer.compute_tangents_and_friction();
+  
+  pmer.set_Hhat();
+  pmer.set_dCdlambda();
+  pmer.set_G();
+  single_step(t,pmer,dt);  
+
+  if (dump_every == 1) {
+
+    fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
+  
+    ioVTK::writeVTKPolyData(fname,pmer);
+
+    ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+
+
+  }
+
+  // continue the remaining numstep - 2 steps
+  for (int i = 2; i <= numsteps; i++) {
+    std::cout << "t = " << t << std::endl;
+    
+    single_step(t,pmer,dt);  
+
+    if (i % dump_every == 0) {
+      fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
+  
+      ioVTK::writeVTKPolyData(fname,pmer);
+
+      ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+      
+    }
+      
+  }
+
+
+  ioVTK::writeVTKcollectionFooter(collection_name);
+
   std::cout << "Constraints are different than zero: " << std::endl;
   std::cout << pmer.constraint_errors << std::endl;
   

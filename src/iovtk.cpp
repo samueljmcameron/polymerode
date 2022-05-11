@@ -5,11 +5,13 @@
 
 #include "iovtk.hpp"
 
-
-
+#include "double_tether.hpp"
+#include "single_tether.hpp"
+#include "no_tether.hpp"
 
 /* Simple function to write a vtk file with binary data. */
-void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
+template <typename pMer>
+void ioVTK::writeVTKPolyData(std::string fname,const pMer &pmer)
 /*============================================================================*/
 /*
   Write scalar image data to a vtk (and paraview) compatible file
@@ -67,6 +69,7 @@ void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
   myfile.close();
   
 }
+
 
 void ioVTK::writeVTKcollectionHeader(const std::string fname)
 {
@@ -164,7 +167,8 @@ void ioVTK::restartVTKcollection(const std::string fname)
 
 
 /* Simple function to write a vtk file with binary data. */
-void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
+template <typename pMer>
+void ioVTK::readVTKPolyData(pMer &pmer,std::string fname)
 /*============================================================================*/
 /*
   Read poly data to a vtk (and paraview) compatible file
@@ -209,3 +213,10 @@ void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
   
 }
 
+template void ioVTK::readVTKPolyData(DoubleTether &pmer,std::string fname);
+template void ioVTK::readVTKPolyData(SingleTether &pmer,std::string fname);
+template void ioVTK::readVTKPolyData(NoTether &pmer,std::string fname);
+
+template void ioVTK::writeVTKPolyData(std::string fname,const DoubleTether &pmer);
+template void ioVTK::writeVTKPolyData(std::string fname,const SingleTether &pmer);
+template void ioVTK::writeVTKPolyData(std::string fname,const NoTether &pmer);

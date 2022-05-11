@@ -1,10 +1,8 @@
 
 #include "PolyConfig.h"
-#include "polymer.hpp"
 #include "globalparams.hpp"
 #include "input.hpp"
 #include "run.hpp"
-#include "runtests.hpp"
 
 #include <Eigen/SparseLU>
 
@@ -74,38 +72,70 @@ int main(int argc, char* argv[])
   
 
   while (std::getline(infile,line) &&
-	 splitvec[0] != "build_polymer") {
+	 splitvec[0] != "double_tether" && splitvec[0] != "single_tether"
+	  && splitvec[0] != "no_tether") {
 
     line = line.substr(0,line.find_first_of("#"));
     splitvec = input::split_line(line);
     
   }
 
+  std::string polymertype = splitvec.at(0);
+
   splitvec.erase(splitvec.begin());
+
+
 
   for (auto &c : splitvec)
     input::convertVariable(c,variables);
-  
-  
-  Polymer pmer(splitvec);
-  std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
 
 
 
   
   if (simulation_type == "run") {
-    std::cout << "Running simulation of polymer." << std::endl;
-    run(gp,pmer);
+    if (polymertype == "double_tether") {
+      DoubleTether pmer(splitvec);
+      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    
+      std::cout << "Running simulation of polymer." << std::endl;
+      run(gp,pmer);
+      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+      std::cout << "Run time = "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
+		<< "seconds." << std::endl;  
+ 
+    } else if (polymertype == "single_tether") {
+      SingleTether pmer(splitvec);
+      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    
+      std::cout << "Running simulation of polymer." << std::endl;
+      run(gp,pmer);
+      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+      std::cout << "Run time = "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
+		<< "seconds." << std::endl;  
+      
+    } else if (polymertype == "no_tether") {
+      NoTether pmer(splitvec);
+      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    
+      std::cout << "Running simulation of polymer." << std::endl;
+      run(gp,pmer);
+      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+      std::cout << "Run time = "
+		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
+		<< "seconds." << std::endl;  
+      
+    } else {
+      std::cout << "Error, simulation keyword must be either single_tether, no_tether, "
+		<< "or double_tether, not " << polymertype << "." << std::endl;
+    }
   } else if (simulation_type == "test") {
     std::cout << "Testing simulation of polymer." << std::endl;
-    test_noise(gp,pmer);
+    //    test_noise(gp,pmer);
   }
 
-  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-  std::cout << "Run time = "
-	    << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
-	    << "seconds." << std::endl;  
   return 0;
   
 }

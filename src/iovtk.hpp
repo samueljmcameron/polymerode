@@ -4,13 +4,13 @@
 #include <string>
 #include <vector>
 
-#include "polymer.hpp"
-
 
 namespace ioVTK {
 
-  void writeVTKPolyData(std::string,const Polymer &);
-  void readVTKPolyData(Polymer &, std::string);
+  template <typename pMer>
+  void writeVTKPolyData(std::string,const pMer &);
+  template <typename pMer>
+  void readVTKPolyData(pMer &, std::string);
   
   void writeVTKcollectionHeader(const std::string);
   void writeVTKcollectionMiddle(const std::string,
