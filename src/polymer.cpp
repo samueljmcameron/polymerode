@@ -356,7 +356,14 @@ void Polymer::single_inv_friction(int i)
 
 }
 
+void Polymer::add_external_force(std::vector<double> &dFdX, int i)
+{
+  atoms[i].Fpot(0) += -dFdX[0];
+  atoms[i].Fpot(1) += -dFdX[1];
+  atoms[i].Fpot(2) += -dFdX[2];
+  return;
 
+}
 
 double Polymer::Hhat_diag_val(int mu)
 {

@@ -31,6 +31,7 @@ public:
 
   void single_inv_friction(int);
 
+  void add_external_force(std::vector<double> &,int);
 
   int get_Nbeads() const;
   double get_temp() const;
