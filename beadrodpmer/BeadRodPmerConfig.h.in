@@ -1,0 +1,2 @@
+#define beadrodpmer_VERSION_MAJOR @beadrodpmer_VERSION_MAJOR@
+#define beadrodpmer_VERSION_MINOR @beadrodpmer_VERSION_MINOR@

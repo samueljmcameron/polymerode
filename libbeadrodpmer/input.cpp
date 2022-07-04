@@ -3,8 +3,9 @@
 
 #include "input.hpp"
 
+namespace BeadRodPmer {
 namespace input {
-  std::vector<std::string> split_line(std::string& line)
+  std::vector<std::string> split_line(const std::string& line)
   {
     
     std::vector<std::string> out;
@@ -31,7 +32,7 @@ namespace input {
     return out;
   }
   
-  bool isInt(std::string &val,int &out,std::string varname)
+  bool isInt(const std::string &val,int &out,std::string varname)
   {
     std::string::size_type sz;
     try { 
@@ -46,7 +47,7 @@ namespace input {
     
   }
   
-  bool isDouble(std::string &val, double &out,
+  bool isDouble(const std::string &val, double &out,
 		std::string varname)
   {
     std::string::size_type sz;
@@ -113,4 +114,5 @@ namespace input {
     
     return;
   }
+}
 }

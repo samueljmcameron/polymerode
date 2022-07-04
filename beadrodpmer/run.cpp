@@ -36,8 +36,8 @@ void update_beadN(atEnd & beadN,const Eigen::Vector3d &xN,double t)
 
 
 
-void single_step(double & t,DoubleTether & pmer,atEnd & bead1,
-		 atEnd & beadN,const Eigen::Vector3d &x0,
+void single_step(double & t,BeadRodPmer::DoubleTether & pmer,
+		 atEnd & bead1,atEnd & beadN,const Eigen::Vector3d &x0,
 		 const Eigen::Vector3d &xN,double dt)
 {
   pmer.set_unprojected_noise(dt);
@@ -75,7 +75,7 @@ void single_step(double & t,DoubleTether & pmer,atEnd & bead1,
 
 
 
-void run(GlobalParams& gp, DoubleTether& pmer)
+void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 {
 
   int numsteps = gp.steps;
@@ -95,12 +95,12 @@ void run(GlobalParams& gp, DoubleTether& pmer)
   // save at time t = 0 always.
 
   std::string collection_name = gp.dump_file + std::string(".pvd");
-  ioVTK::writeVTKcollectionHeader(collection_name);
+  BeadRodPmer::ioVTK::writeVTKcollectionHeader(collection_name);
 
   
   std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
-  ioVTK::writeVTKPolyData(fname,pmer);
-  ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+  BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
+  BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
   pmer.compute_tangents_and_friction();
@@ -115,9 +115,9 @@ void run(GlobalParams& gp, DoubleTether& pmer)
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
-    ioVTK::writeVTKPolyData(fname,pmer);
+    BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
 
-    ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+    BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
   }
@@ -131,16 +131,16 @@ void run(GlobalParams& gp, DoubleTether& pmer)
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-      ioVTK::writeVTKPolyData(fname,pmer);
+      BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
 
-      ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+      BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
     }
       
   }
 
 
-  ioVTK::writeVTKcollectionFooter(collection_name);
+  BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
   std::cout << "Constraints are different than zero: " << std::endl;
   std::cout << pmer.constraint_errors << std::endl;
@@ -150,8 +150,8 @@ void run(GlobalParams& gp, DoubleTether& pmer)
 }
 
 
-void single_step(double & t,SingleTether & pmer,atEnd & bead1,
-		 const Eigen::Vector3d &x0,double dt)
+void single_step(double & t,BeadRodPmer::SingleTether & pmer,
+		 atEnd & bead1, const Eigen::Vector3d &x0,double dt)
 {
   pmer.set_unprojected_noise(dt);
   pmer.update_G();
@@ -184,7 +184,7 @@ void single_step(double & t,SingleTether & pmer,atEnd & bead1,
 }
 
 
-void run(GlobalParams& gp, SingleTether& pmer)
+void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 {
 
   int numsteps = gp.steps;
@@ -203,12 +203,12 @@ void run(GlobalParams& gp, SingleTether& pmer)
   // save at time t = 0 always.
 
   std::string collection_name = gp.dump_file + std::string(".pvd");
-  ioVTK::writeVTKcollectionHeader(collection_name);
+  BeadRodPmer::ioVTK::writeVTKcollectionHeader(collection_name);
 
   
   std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
-  ioVTK::writeVTKPolyData(fname,pmer);
-  ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+  BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
+  BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
   pmer.compute_tangents_and_friction();
@@ -222,9 +222,9 @@ void run(GlobalParams& gp, SingleTether& pmer)
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
-    ioVTK::writeVTKPolyData(fname,pmer);
+    BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
 
-    ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+    BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
   }
@@ -238,16 +238,16 @@ void run(GlobalParams& gp, SingleTether& pmer)
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-      ioVTK::writeVTKPolyData(fname,pmer);
+      BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
 
-      ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+      BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
     }
       
   }
 
 
-  ioVTK::writeVTKcollectionFooter(collection_name);
+  BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
   std::cout << "Constraints are different than zero: " << std::endl;
   std::cout << pmer.constraint_errors << std::endl;
@@ -257,7 +257,7 @@ void run(GlobalParams& gp, SingleTether& pmer)
 }
 
 
-void single_step(double & t, NoTether & pmer,double dt)
+void single_step(double & t, BeadRodPmer::NoTether & pmer,double dt)
 {
   pmer.set_unprojected_noise(dt);
   pmer.update_G();
@@ -289,7 +289,7 @@ void single_step(double & t, NoTether & pmer,double dt)
 }
 
 
-void run(GlobalParams& gp, NoTether& pmer)
+void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
 {
 
   int numsteps = gp.steps;
@@ -306,12 +306,12 @@ void run(GlobalParams& gp, NoTether& pmer)
   // save at time t = 0 always.
 
   std::string collection_name = gp.dump_file + std::string(".pvd");
-  ioVTK::writeVTKcollectionHeader(collection_name);
+  BeadRodPmer::ioVTK::writeVTKcollectionHeader(collection_name);
 
   
   std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
-  ioVTK::writeVTKPolyData(fname,pmer);
-  ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+  BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
+  BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
   pmer.compute_tangents_and_friction();
@@ -325,9 +325,9 @@ void run(GlobalParams& gp, NoTether& pmer)
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
-    ioVTK::writeVTKPolyData(fname,pmer);
+    BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
 
-    ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+    BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
   }
@@ -341,16 +341,16 @@ void run(GlobalParams& gp, NoTether& pmer)
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-      ioVTK::writeVTKPolyData(fname,pmer);
+      BeadRodPmer::ioVTK::writeVTKPolyData(fname,pmer);
 
-      ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
+      BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
     }
       
   }
 
 
-  ioVTK::writeVTKcollectionFooter(collection_name);
+  BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
   std::cout << "Constraints are different than zero: " << std::endl;
   std::cout << pmer.constraint_errors << std::endl;

@@ -1,10 +1,10 @@
-#ifndef IOVTK_HPP
-#define IOVTK_HPP
+#ifndef BEADRODPMER_IOVTK_HPP
+#define BEADRODPMER_IOVTK_HPP
 
 #include <string>
 #include <vector>
 
-
+namespace BeadRodPmer {
 namespace ioVTK {
 
   template <typename pMer>
@@ -22,6 +22,8 @@ namespace ioVTK {
   
 }
 
+};
 
+#include "iovtk.tpp"
 
 #endif

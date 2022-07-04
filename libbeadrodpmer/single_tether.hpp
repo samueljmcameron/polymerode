@@ -1,14 +1,14 @@
 
-#ifndef SINGLE_TETHER_HPP
-#define SINGLE_TETHER_HPP
+#ifndef BEADRODPMER_SINGLE_TETHER_HPP
+#define BEADRODPMER_SINGLE_TETHER_HPP
 
 #include "polymer.hpp"
 
-
+namespace BeadRodPmer {
 class SingleTether : public Polymer {
 public:
   // constructor
-  SingleTether(std::vector<std::string>);
+  SingleTether(const std::vector<std::string> &);
   ~SingleTether();  
   
   
@@ -63,5 +63,5 @@ private:
   void set_rhs_of_Hhat(const Eigen::Vector3d &);
   
 };
-
+};
 #endif

@@ -1,9 +1,11 @@
 
-#ifndef ATOM_HPP
-#define ATOM_HPP
+#ifndef BEADRODPMER_ATOM_HPP
+#define BEADRODPMER_ATOM_HPP
 
 #include <Eigen/Core>
 
+
+namespace BeadRodPmer {
 class Atom {
 public:
   Atom() {};
@@ -20,5 +22,5 @@ public:
 
 
 };
-
+};
 #endif

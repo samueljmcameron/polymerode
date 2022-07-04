@@ -1,9 +1,13 @@
 #include <iostream>
 #include "globalparams.hpp"
 
+
+using namespace BeadRodPmer;
 GlobalParams::GlobalParams(std::ifstream& input,
 			   std::map<std::string,std::string> const& varMap,
-			   std::string& lastline)
+			   std::string& lastline) :
+  default_molecules(1),default_steps(1000000),default_timestep(0.001),
+  default_dump_every(1000000),default_dump_file("dump.trj")
 {
 
   molecules = default_molecules;

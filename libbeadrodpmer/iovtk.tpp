@@ -1,13 +1,11 @@
+/* -*- c++ -*- */
+
 #include <stdexcept>
 #include <fstream>
 
 #include <algorithm>
 
-#include "iovtk.hpp"
-
-#include "double_tether.hpp"
-#include "single_tether.hpp"
-#include "no_tether.hpp"
+namespace BeadRodPmer {
 
 /* Simple function to write a vtk file with binary data. */
 template <typename pMer>
@@ -213,10 +211,4 @@ void ioVTK::readVTKPolyData(pMer &pmer,std::string fname)
   
 }
 
-template void ioVTK::readVTKPolyData(DoubleTether &pmer,std::string fname);
-template void ioVTK::readVTKPolyData(SingleTether &pmer,std::string fname);
-template void ioVTK::readVTKPolyData(NoTether &pmer,std::string fname);
-
-template void ioVTK::writeVTKPolyData(std::string fname,const DoubleTether &pmer);
-template void ioVTK::writeVTKPolyData(std::string fname,const SingleTether &pmer);
-template void ioVTK::writeVTKPolyData(std::string fname,const NoTether &pmer);
+}

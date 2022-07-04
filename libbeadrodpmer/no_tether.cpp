@@ -8,11 +8,13 @@
 
 
 #define SMALL 1e-14
- 
+
+using namespace BeadRodPmer;
+
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-NoTether::NoTether(std::vector<std::string> splitvec)
+NoTether::NoTether(const std::vector<std::string> & splitvec)
   : Polymer(splitvec)
 {
 

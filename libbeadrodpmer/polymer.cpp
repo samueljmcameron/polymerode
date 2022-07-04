@@ -8,6 +8,8 @@
 
 
 #define SMALL 1e-14
+
+namespace BeadRodPmer {
 namespace gramschmidt {
   void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
 		   Eigen::Vector3d& ez)
@@ -50,7 +52,7 @@ namespace gramschmidt {
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-Polymer::Polymer(std::vector<std::string> splitvec)
+Polymer::Polymer(const std::vector<std::string> & splitvec)
   : gen(0), dist(-0.5,0.5)
 {
 
@@ -58,6 +60,7 @@ Polymer::Polymer(std::vector<std::string> splitvec)
   int nargs = splitvec.size();
   int iarg = 0;
 
+  int number_of_nuc_beads;
   int seed;
   
   while (iarg < nargs) {
@@ -87,6 +90,12 @@ Polymer::Polymer(std::vector<std::string> splitvec)
     } else if (splitvec[iarg] == "seed") {
       input::isInt(splitvec[iarg+1],seed,splitvec[iarg]);
       iarg += 2;
+    } else if (splitvec[iarg] == "nuc_beads") {
+      input::isInt(splitvec[iarg+1],number_of_nuc_beads,splitvec[iarg]);
+      nuc_beads.resize(number_of_nuc_beads);
+      for (int i = 1; i <= number_of_nuc_beads; i++) 
+	input::isInt(splitvec[iarg+1+i],nuc_beads[i-1],splitvec[iarg]);
+      iarg += number_of_nuc_beads+2;
     } else {
       throw std::runtime_error("Error: invalid argument for build_polymer.");
     }
@@ -356,7 +365,7 @@ void Polymer::single_inv_friction(int i)
 
 }
 
-void Polymer::add_external_force(std::vector<double> &dFdX, int i)
+void Polymer::add_external_force(const std::vector<double> &dFdX, int i)
 {
   atoms[i].Fpot(0) += -dFdX[0];
   atoms[i].Fpot(1) += -dFdX[1];
@@ -549,5 +558,5 @@ double Polymer::get_timescale(double dt) const
   return dt*temp/(bondlength*zperp);
 }
 
-
+};
 

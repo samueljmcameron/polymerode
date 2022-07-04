@@ -1,5 +1,5 @@
 
-#include "PolyConfig.h"
+#include "BeadRodPmerConfig.h"
 #include "globalparams.hpp"
 #include "input.hpp"
 #include "run.hpp"
@@ -16,8 +16,8 @@
 
 int main(int argc, char* argv[])
 {
-  std::cout << argv[0] << " version " << poly_VERSION_MAJOR << "."
-	    << poly_VERSION_MINOR << std::endl;
+  std::cout << argv[0] << " version " << beadrodpmer_VERSION_MAJOR << "."
+	    << beadrodpmer_VERSION_MINOR << std::endl;
 
 
   std::ifstream infile;
@@ -65,10 +65,10 @@ int main(int argc, char* argv[])
   std::string line;
   std::vector<std::string> splitvec;
     
-  GlobalParams gp(infile,variables,line);
+  BeadRodPmer::GlobalParams gp(infile,variables,line);
 
   line = line.substr(0,line.find_first_of("#"));
-  splitvec = input::split_line(line);
+  splitvec = BeadRodPmer::input::split_line(line);
   
 
   while (std::getline(infile,line) &&
@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
 	  && splitvec[0] != "no_tether") {
 
     line = line.substr(0,line.find_first_of("#"));
-    splitvec = input::split_line(line);
+    splitvec = BeadRodPmer::input::split_line(line);
     
   }
 
@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
 
 
   for (auto &c : splitvec)
-    input::convertVariable(c,variables);
+    BeadRodPmer::input::convertVariable(c,variables);
 
 
 
@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
   
   if (simulation_type == "run") {
     if (polymertype == "double_tether") {
-      DoubleTether pmer(splitvec);
+      BeadRodPmer::DoubleTether pmer(splitvec);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
 		<< "seconds." << std::endl;  
  
     } else if (polymertype == "single_tether") {
-      SingleTether pmer(splitvec);
+      BeadRodPmer::SingleTether pmer(splitvec);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;
@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 		<< "seconds." << std::endl;  
       
     } else if (polymertype == "no_tether") {
-      NoTether pmer(splitvec);
+      BeadRodPmer::NoTether pmer(splitvec);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;

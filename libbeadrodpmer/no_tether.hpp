@@ -1,14 +1,14 @@
 
-#ifndef NO_TETHER_HPP
-#define NO_TETHER_HPP
+#ifndef BEADRODPMER_NO_TETHER_HPP
+#define BEADRODPMER_NO_TETHER_HPP
 
 #include "polymer.hpp"
 
-
+namespace BeadRodPmer {
 class NoTether : public Polymer {
 public:
   // constructor
-  NoTether(std::vector<std::string>);
+  NoTether(const std::vector<std::string> &);
   ~NoTether();  
 
 
@@ -60,5 +60,5 @@ private:
   void set_rhs_of_Hhat();
   
 };
-
+};
 #endif

@@ -1,4 +1,4 @@
-#include "single_tether.hpp"
+#include "double_tether.hpp"
 #include "input.hpp"
 
 
@@ -6,58 +6,61 @@
 #include <cmath>
 #include <stdexcept>
 
+using namespace BeadRodPmer;
 
-#define SMALL 1e-14
- 
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-SingleTether::SingleTether(std::vector<std::string> splitvec)
+DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
   : Polymer(splitvec)
 {
 
-
-  rhs_of_G.resize(Nbeads+2);
-  dummy_for_noise.resize(Nbeads+2);
-  Gmunu.resize(Nbeads+2,Nbeads+2);
-
-
-  
-
-  rhs_of_Hhat.resize(Nbeads+2);
-  tension.resize(Nbeads+2);
-  Hhat.resize(Nbeads+2,Nbeads+2);
+  rhs_of_G.resize(Nbeads+5);
+  dummy_for_noise.resize(Nbeads+5);
+  Gmunu.resize(Nbeads+5,Nbeads+5);
 
 
   
-  dCdlambda.resize(Nbeads+2,Nbeads+2);
+
+  rhs_of_Hhat.resize(Nbeads+5);
+  tension.resize(Nbeads+5);
+  Hhat.resize(Nbeads+5,Nbeads+5);
+
+
+  
+  dCdlambda.resize(Nbeads+5,Nbeads+5);
 
   
 
 
-  constraint_errors.resize(Nbeads+2);
+  constraint_errors.resize(Nbeads+5);
 
-  negative_tension_change.resize(Nbeads+2);
+  negative_tension_change.resize(Nbeads+5);
   
-  tDets.resize(Nbeads);
+  tDets.resize(Nbeads+3);
   bDets.resize(Nbeads+3);
 
-  end_inverses.setZero();
+
   
 }
 
 /* -------------------------------------------------------------------------- */
 /* Destructor */
 /* -------------------------------------------------------------------------- */
-SingleTether::~SingleTether()
+DoubleTether::~DoubleTether()
 {
 }
+
+
+
+
+
 
 
 /* ---------------------------------------------------------------------------- */
 /* RHS of G*eta = P. */
 /* ---------------------------------------------------------------------------- */
-void SingleTether::set_rhs_of_G()
+void DoubleTether::set_rhs_of_G()
 {
   int offset = 2;
   rhs_of_G(-2+offset) = atoms[0].unprojected_noise(0);
@@ -69,6 +72,9 @@ void SingleTether::set_rhs_of_G()
 
   }
 
+  rhs_of_G(Nbeads+offset) = atoms[Nbeads-1].unprojected_noise(0);
+  rhs_of_G(Nbeads+1+offset) = atoms[Nbeads-1].unprojected_noise(1);
+  rhs_of_G(Nbeads+2+offset) = atoms[Nbeads-1].unprojected_noise(2);
   
   return;
   
@@ -78,7 +84,7 @@ void SingleTether::set_rhs_of_G()
 /* -------------------------------------------------------------------------- */
 /* Initialse G in G*eta = P (only call once). */
 /* -------------------------------------------------------------------------- */
-void SingleTether::set_G()
+void DoubleTether::set_G()
 {
 
   std::vector<T> coefficients = init_G_coeffsmatrix();
@@ -95,7 +101,7 @@ void SingleTether::set_G()
 /* -------------------------------------------------------------------------- */
 /* Helper function to initialise matrix G. */
 /* -------------------------------------------------------------------------- */
-std::vector<T> SingleTether::init_G_coeffsmatrix()
+std::vector<T> DoubleTether::init_G_coeffsmatrix()
 {
   // just set lower diagonal
   int offset = 2;
@@ -118,6 +124,14 @@ std::vector<T> SingleTether::init_G_coeffsmatrix()
     coeffs.push_back(T(i+offset+1,i+offset,-costhetas(i-1)));
 
   }
+
+
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads-1,bonds[Nbeads-2].rod(0)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads,1));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads-1,bonds[Nbeads-2].rod(1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+1,1));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads-1,bonds[Nbeads-2].rod(2)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+2,1));
   
   return coeffs;
 
@@ -127,7 +141,7 @@ std::vector<T> SingleTether::init_G_coeffsmatrix()
 /* -------------------------------------------------------------------------- */
 /* Update matrix G. Call at every time step aside from initial step. */
 /* -------------------------------------------------------------------------- */
-void SingleTether::update_G()
+void DoubleTether::update_G()
 {
   // update first four cols by hand
 
@@ -153,11 +167,14 @@ void SingleTether::update_G()
     }
   }
 
+  Gmunu.coeffRef(offset+Nbeads,offset+Nbeads-1) = bonds[Nbeads-2].rod(0);
+  Gmunu.coeffRef(offset+Nbeads+1,offset+Nbeads-1) = bonds[Nbeads-2].rod(1);
+  Gmunu.coeffRef(offset+Nbeads+2,offset+Nbeads-1) = bonds[Nbeads-2].rod(2);
   
   return;
 }
 
-void SingleTether::compute_effective_kappa()
+void DoubleTether::compute_effective_kappa()
 {
 
   int offset = 2;
@@ -186,13 +203,21 @@ void SingleTether::compute_effective_kappa()
   bDets(-1+offset) = bDets(offset)-bonds[0].rod(1)*bonds[0].rod(1)*bDets(2+offset);
   bDets(-2+offset) = bDets(-1+offset)-bonds[0].rod(0)*bonds[0].rod(0)*bDets(2+offset);
 
+  tDets(Nbeads) = tDets(Nbeads-1) - bonds[Nbeads-2].rod(0)*bonds[Nbeads-2].rod(0)*tDets(Nbeads-2);
+  tDets(Nbeads+1) = tDets(Nbeads) - bonds[Nbeads-2].rod(1)*bonds[Nbeads-2].rod(1)*tDets(Nbeads-2);
+  tDets(Nbeads+2) = tDets(Nbeads+1) - bonds[Nbeads-2].rod(2)*bonds[Nbeads-2].rod(2)*tDets(Nbeads-2);
 
-  double gDet = bDets(-2+offset);
+  double gDet = tDets(Nbeads+2);
   end_inverses(0) = bonds[0].rod(0)*bDets(2+offset)/(gDet*bondlength);
   end_inverses(1) = bonds[0].rod(1)*bDets(2+offset)/(gDet*bondlength);
   end_inverses(2) = bonds[0].rod(2)*bDets(2+offset)/(gDet*bondlength);
-  
 
+
+  end_inverses(3) = -bonds[Nbeads-2].rod(0)*tDets(Nbeads-2)/(gDet*bondlength);
+  end_inverses(4) = -bonds[Nbeads-2].rod(1)*tDets(Nbeads-2)/(gDet*bondlength);
+  end_inverses(5) = -bonds[Nbeads-2].rod(2)*tDets(Nbeads-2)/(gDet*bondlength);
+
+  
 
   
   for (int i = 0; i < Nbeads-2; i++) {
@@ -209,23 +234,25 @@ void SingleTether::compute_effective_kappa()
 }
 
 
-
-
 /* ---------------------------------------------------------------------------- */
 /* RHS of Hhat*lambda = Q. */
 /* ---------------------------------------------------------------------------- */
-void SingleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1)
+void DoubleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1,
+				   const Eigen::Vector3d &dXdt_at_N)
 {
 
 
   int offset = 2;
 
   
-  Eigen::Vector3d tmp = atoms[0].friction*(atoms[0].Fpot+atoms[0].noise)-dXdt_at_1;
+  Eigen::Vector3d tmp = atoms[0].friction*(atoms[0].Fpot+atoms[0].noise) - dXdt_at_1;
 
-  rhs_of_Hhat(-2+offset) = tmp(0); 
+  rhs_of_Hhat(-2+offset) = tmp(0);
   rhs_of_Hhat(-1+offset) = tmp(1);
   rhs_of_Hhat(0+offset) = tmp(2);
+
+
+
   
   for (int i = 0; i< Nbeads-1; i++) {
 
@@ -234,9 +261,17 @@ void SingleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1)
 								    +atoms[i+1].noise)
 					       -atoms[i].friction*(atoms[i].Fpot
 								   +atoms[i].noise));
-    
+
   }
 
+  tmp = atoms[Nbeads-1].friction*(atoms[Nbeads-1].Fpot+atoms[Nbeads-1].noise) - dXdt_at_N;
+
+  rhs_of_Hhat(offset+Nbeads) = tmp(0);
+  rhs_of_Hhat(offset+Nbeads+1) = tmp(1);
+  rhs_of_Hhat(offset+Nbeads+2) = tmp(2);
+
+
+  
   return;
   
 }
@@ -249,7 +284,7 @@ void SingleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1)
 /* -------------------------------------------------------------------------- */
 /* Initialise matrix H hat. */
 /* -------------------------------------------------------------------------- */
-void SingleTether::set_Hhat()
+void DoubleTether::set_Hhat()
 {
 
   std::vector<T> coefficients = init_Hhat_coeffsmatrix();
@@ -267,7 +302,7 @@ void SingleTether::set_Hhat()
 /* -------------------------------------------------------------------------- */
 /* Helper function to initialise matrix H hat. */
 /* -------------------------------------------------------------------------- */
-std::vector<T> SingleTether::init_Hhat_coeffsmatrix()
+std::vector<T> DoubleTether::init_Hhat_coeffsmatrix()
 {
 
   // only use lower triangular part as it's a symmetric matrix.  
@@ -298,6 +333,19 @@ std::vector<T> SingleTether::init_Hhat_coeffsmatrix()
 
   }
 
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads-1,Hhat_bottomside(0)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads-1,Hhat_bottomside(1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads-1,Hhat_bottomside(2)));
+
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads,Hhat_endblocks(0,0,Nbeads-1)));
+  
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads,Hhat_endblocks(1,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+1,Hhat_endblocks(1,1,Nbeads-1)));
+
+  
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads,Hhat_endblocks(2,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+1,Hhat_endblocks(2,1,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+2,Hhat_endblocks(2,2,Nbeads-1)));
 
   return coeffs;
 
@@ -312,7 +360,7 @@ std::vector<T> SingleTether::init_Hhat_coeffsmatrix()
 /* -------------------------------------------------------------------------- */
 /* Update matrix M. Call at every time step aside from initial step. */
 /* -------------------------------------------------------------------------- */
-void SingleTether::update_Hhat()
+void DoubleTether::update_Hhat()
 {
 
   int offset = 2;
@@ -352,6 +400,18 @@ void SingleTether::update_Hhat()
 
   Hhat.coeffRef(offset+Nbeads-1,offset+Nbeads-1) = Hhat_diag_val(Nbeads-2);
 
+  Hhat.coeffRef(offset+Nbeads,offset+Nbeads-1) = Hhat_bottomside(0);
+  Hhat.coeffRef(offset+Nbeads+1,offset+Nbeads-1) = Hhat_bottomside(1);
+  Hhat.coeffRef(offset+Nbeads+2,offset+Nbeads-1) = Hhat_bottomside(2);
+
+  Hhat.coeffRef(offset+Nbeads,offset+Nbeads) = Hhat_endblocks(0,0,Nbeads-1);
+
+  Hhat.coeffRef(offset+Nbeads+1,offset+Nbeads) = Hhat_endblocks(1,0,Nbeads-1);
+  Hhat.coeffRef(offset+Nbeads+1,offset+Nbeads+1) = Hhat_endblocks(1,1,Nbeads-1);
+
+  Hhat.coeffRef(offset+Nbeads+2,offset+Nbeads) = Hhat_endblocks(2,0,Nbeads-1);
+  Hhat.coeffRef(offset+Nbeads+2,offset+Nbeads+1) = Hhat_endblocks(2,1,Nbeads-1);
+  Hhat.coeffRef(offset+Nbeads+2,offset+Nbeads+2) = Hhat_endblocks(2,2,Nbeads-1);
 
   return;
 }
@@ -360,9 +420,9 @@ void SingleTether::update_Hhat()
 
 
 /* -------------------------------------------------------------------------- */
-/* Initialise both the dCdlambda and mat_tmp matrices. */
+/* Initialise the dCdlambda matrix. */
 /* -------------------------------------------------------------------------- */
-void SingleTether::set_dCdlambda()
+void DoubleTether::set_dCdlambda()
 {
 
   std::vector<T> coefficients = init_dCdlambda_coeffsmatrix();
@@ -380,7 +440,7 @@ void SingleTether::set_dCdlambda()
 /* -------------------------------------------------------------------------- */
 /* Helper function to initialise matrix dCdlambda. */
 /* -------------------------------------------------------------------------- */
-std::vector<T> SingleTether::init_dCdlambda_coeffsmatrix()
+std::vector<T> DoubleTether::init_dCdlambda_coeffsmatrix()
 {
 
   // initializing the vector as the full (both upper and lower) part of Hhat, since
@@ -421,6 +481,26 @@ std::vector<T> SingleTether::init_dCdlambda_coeffsmatrix()
   }
 
   
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads,Hhat_bottomside(0)));
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads+1,Hhat_bottomside(1)));
+  coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads+2,Hhat_bottomside(2)));
+
+  
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads-1,Hhat_bottomside(0)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads,Hhat_endblocks(0,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads+1,Hhat_endblocks(1,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads,offset+Nbeads+2,Hhat_endblocks(2,0,Nbeads-1)));
+  
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads-1,Hhat_bottomside(1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads,Hhat_endblocks(1,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+1,Hhat_endblocks(1,1,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+1,offset+Nbeads+2,Hhat_endblocks(2,1,Nbeads-1)));
+  
+  
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads-1,Hhat_bottomside(2)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads,Hhat_endblocks(2,0,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+1,Hhat_endblocks(2,1,Nbeads-1)));
+  coeffs.push_back(T(offset+Nbeads+2,offset+Nbeads+2,Hhat_endblocks(2,2,Nbeads-1)));
 
   return coeffs;
 
@@ -432,7 +512,7 @@ std::vector<T> SingleTether::init_dCdlambda_coeffsmatrix()
 
 
 
-void SingleTether::update_dCdlambda(double Delta_t)
+void DoubleTether::update_dCdlambda(double Delta_t)
 {
   // must update column-wise
   int offset = 2;
@@ -500,6 +580,33 @@ void SingleTether::update_dCdlambda(double Delta_t)
   							 
   dCdlambda.coeffRef(offset+Nbeads-1, offset+Nbeads-1) = - dCdlambda_diag_val(Nbeads-2)*Delta_t;
 
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads-1) = -Hhat_bottomside(0)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads-1) = -Hhat_bottomside(1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads-1) = -Hhat_bottomside(2)*Delta_t;
+  
+  
+  
+  // Nbeads col
+  dCdlambda.coeffRef(offset+Nbeads-1,offset+Nbeads) = -dCdlambda_bottomside(0)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads) = -Hhat_endblocks(0,0,Nbeads-1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads) = -Hhat_endblocks(1,0,Nbeads-1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads) = -Hhat_endblocks(2,0,Nbeads-1)*Delta_t;
+  
+  
+  // Nbeads+1 col
+  dCdlambda.coeffRef(offset+Nbeads-1,offset+Nbeads+1) = -dCdlambda_bottomside(1)*Delta_t;
+
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads+1) = -Hhat_endblocks(1,0,Nbeads-1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads+1) = -Hhat_endblocks(1,1,Nbeads-1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads+1) = -Hhat_endblocks(2,1,Nbeads-1)*Delta_t;
+
+
+  // Nbeads +2 col
+  dCdlambda.coeffRef(offset+Nbeads-1,offset+Nbeads+2) = -dCdlambda_bottomside(2)*Delta_t;
+
+  dCdlambda.coeffRef(offset+Nbeads,offset+Nbeads+2) = -Hhat_endblocks(2,0,Nbeads-1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+1,offset+Nbeads+2) = -Hhat_endblocks(2,1,Nbeads-1)*Delta_t;
+  dCdlambda.coeffRef(offset+Nbeads+2,offset+Nbeads+2) = -Hhat_endblocks(2,2,Nbeads-1)*Delta_t;
 
   return;
 
@@ -507,7 +614,7 @@ void SingleTether::update_dCdlambda(double Delta_t)
 
 
 
-void SingleTether::compute_noise()
+void DoubleTether::compute_noise()
 {
 
   int offset = 2;
@@ -537,30 +644,36 @@ void SingleTether::compute_noise()
   atoms[i].noise = (atoms[i].unprojected_noise
 		    - dummy_for_noise(i+offset)*bonds[i-1].rod);
 
+  atoms[i].noise(0) -= dummy_for_noise(offset+1+Nbeads-1);
+  atoms[i].noise(1) -= dummy_for_noise(offset+1+Nbeads);
+  atoms[i].noise(2) -= dummy_for_noise(offset+1+Nbeads+1);
   
 }
 
 
-void SingleTether::compute_tension(const Eigen::Vector3d & dXdt_at_1)
+void DoubleTether::compute_tension(const Eigen::Vector3d & dXdt_at_1,
+				   const Eigen::Vector3d & dXdt_at_N)
 {
 
 
 
-  set_rhs_of_Hhat(dXdt_at_1);
+  set_rhs_of_Hhat(dXdt_at_1,dXdt_at_N);
 
   Hhat_solver.factorize(Hhat);
   tension =  Hhat_solver.solve(rhs_of_Hhat);
   
 }
 
-void SingleTether::test_jacob(int mu,double Delta_t,const Eigen::Vector3d & X_of_t_at_1)
+void DoubleTether::test_jacob(int mu,double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
+			      const Eigen::Vector3d & X_of_t_at_N)
 {
 
   int offset = 2;  
   // start by initializing the vector dC at whatever tensions
+
+
   
-  
-  calculate_constraint_errors(X_of_t_at_1);
+  calculate_constraint_errors(X_of_t_at_1,X_of_t_at_N);
 
 
   update_dCdlambda(Delta_t);
@@ -579,8 +692,8 @@ void SingleTether::test_jacob(int mu,double Delta_t,const Eigen::Vector3d & X_of
     tension(mu+offset) += tens_change;
     
     final_integrate(Delta_t);
+    calculate_constraint_errors(X_of_t_at_1,X_of_t_at_N);
 
-    calculate_constraint_errors(X_of_t_at_1);
     
     std::cout << "numerical estimate with dlamda =  " << tens_change
 	      << "and lambda = " << tension(mu+offset) << " is = " << std::endl;
@@ -594,13 +707,13 @@ void SingleTether::test_jacob(int mu,double Delta_t,const Eigen::Vector3d & X_of
   return;
 }  
 
-void SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
-				   double tolerance)
+void DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
+				   const Eigen::Vector3d & X_of_t_at_N,double tolerance)
 {
 
   // set C_mu and dC_mu/dlambda_nu
   final_integrate(Delta_t);
-  calculate_constraint_errors(X_of_t_at_1);
+  calculate_constraint_errors(X_of_t_at_1,X_of_t_at_N);
   update_dCdlambda(Delta_t);
 
   
@@ -617,7 +730,7 @@ void SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t
 
 
     final_integrate(Delta_t);
-    calculate_constraint_errors(X_of_t_at_1);
+    calculate_constraint_errors(X_of_t_at_1,X_of_t_at_N);
     update_dCdlambda(Delta_t);
 
   
@@ -639,7 +752,7 @@ void SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t
    un-normalised bond tangents, the (normalised) bead tangents, friction
    tensors, and cos(theta_i)s. */
 /*----------------------------------------------------------------------------*/
-void SingleTether::initial_integrate(double Delta_t)
+void DoubleTether::initial_integrate(double Delta_t)
 {
   
   double tmp = Delta_t/2.0;
@@ -711,6 +824,9 @@ void SingleTether::initial_integrate(double Delta_t)
 
   atoms[i].t_force = -tension(offset+i)*bonds[i-1].rod;
 
+  atoms[i].t_force(0) -= tension(offset+Nbeads);
+  atoms[i].t_force(1) -= tension(offset+Nbeads+1);
+  atoms[i].t_force(2) -= tension(offset+Nbeads+2);
 
 
   atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
@@ -742,7 +858,7 @@ void SingleTether::initial_integrate(double Delta_t)
 /*----------------------------------------------------------------------------*/
 /* Computes the final bead positions and unnormalised bond tangents. */
 /*----------------------------------------------------------------------------*/
-void SingleTether::final_integrate(double Delta_t)
+void DoubleTether::final_integrate(double Delta_t)
 {
   
   double tmp = Delta_t;
@@ -774,6 +890,9 @@ void SingleTether::final_integrate(double Delta_t)
 
   atoms[i].t_force = -tension(offset+i)*bonds[i-1].rod;
 
+  atoms[i].t_force(0) -= tension(offset+Nbeads);
+  atoms[i].t_force(1) -= tension(offset+Nbeads+1);
+  atoms[i].t_force(2) -= tension(offset+Nbeads+2);
 
   atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
   tmpbonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
@@ -782,8 +901,8 @@ void SingleTether::final_integrate(double Delta_t)
 
 
 
-
-void SingleTether::calculate_constraint_errors(const Eigen::Vector3d & X_of_t_at_1)
+void DoubleTether::calculate_constraint_errors(const Eigen::Vector3d & X_of_t_at_1,
+					       const Eigen::Vector3d & X_of_t_at_N)
 {
   int offset = 2;
   constraint_errors(offset-2) = atoms[0].R(0)-X_of_t_at_1(0);
@@ -793,6 +912,10 @@ void SingleTether::calculate_constraint_errors(const Eigen::Vector3d & X_of_t_at
     constraint_errors(offset+mu) = (atoms[mu].R-atoms[mu-1].R).norm()-bondlength;
   }
 
+  constraint_errors(offset+Nbeads) = atoms[Nbeads-1].R(0)-X_of_t_at_N(0);
+  constraint_errors(offset+Nbeads+1) = atoms[Nbeads-1].R(1)-X_of_t_at_N(1);
+  constraint_errors(offset+Nbeads+2) = atoms[Nbeads-1].R(2)-X_of_t_at_N(2);
   return;
 
 }
+

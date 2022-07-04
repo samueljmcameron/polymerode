@@ -1,14 +1,14 @@
 
-#ifndef DOUBLE_TETHER_HPP
-#define DOUBLE_TETHER_HPP
+#ifndef BEADRODPMER_DOUBLE_TETHER_HPP
+#define BEADRODPMER_DOUBLE_TETHER_HPP
 
 #include "polymer.hpp"
 
-
+namespace BeadRodPmer {
 class DoubleTether : public Polymer {
 public:
   // constructor
-  DoubleTether(std::vector<std::string>);
+  DoubleTether(const std::vector<std::string> &);
   ~DoubleTether();  
   
   double omega, rad;
@@ -69,5 +69,5 @@ private:
 		       const Eigen::Vector3d &);
   
 };
-
+};
 #endif

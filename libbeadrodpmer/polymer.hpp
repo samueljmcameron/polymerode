@@ -1,6 +1,6 @@
 
-#ifndef POLYMER_HPP
-#define POLYMER_HPP
+#ifndef BEADRODPMER_POLYMER_HPP
+#define BEADRODPMER_POLYMER_HPP
 
 #include "atom.hpp"
 #include "bond.hpp"
@@ -13,14 +13,17 @@
 #include <string>
 #include <random>
 
-
+namespace BeadRodPmer {
 typedef Eigen::SparseMatrix<double> SpMat; // declares column-major
 typedef Eigen::Triplet<double> T;
+
+
+  
 
 class Polymer {
 public:
   // constructor
-  Polymer(std::vector<std::string>);
+  Polymer(const std::vector<std::string> &);
   ~Polymer();  
 
 
@@ -31,7 +34,7 @@ public:
 
   void single_inv_friction(int);
 
-  void add_external_force(std::vector<double> &,int);
+  void add_external_force(const std::vector<double> &,int);
 
   int get_Nbeads() const;
   double get_temp() const;
@@ -46,7 +49,7 @@ public:
   std::vector<Eigen::Vector3d> Rtmp;    // temporary storate for midstep
 
   
-
+  std::vector<int> nuc_beads;
 
 
   SpMat Gmunu;      // geometric tensor
@@ -113,5 +116,5 @@ protected:
 
 
 };
-
+};
 #endif

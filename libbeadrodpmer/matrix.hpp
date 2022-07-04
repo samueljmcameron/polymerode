@@ -1,12 +1,13 @@
 
-#ifndef MATRIX_HPP
-#define MATRIX_HPP
+#ifndef BEADRODPMER_MATRIX_HPP
+#define BEADRODPMER_MATRIX_HPP
 
 #include <iostream>
 #include <vector>
 #include <Eigen/Core>
 #include <Eigen/SparseCholesky>
 
+namespace BeadRodPmer {
 template<class T>
 class Matrix
 {
@@ -21,7 +22,7 @@ class Matrix
   */
   
 public:
-  Matrix(size_t rin=0, size_t cin=0) :
+v  Matrix(size_t rin=0, size_t cin=0) :
     rows(rin), cols(cin) {
     m_Data.resize(rows*cols);
   };
@@ -67,7 +68,7 @@ std::ostream& operator << (std::ostream& out, Matrix& data)
 }
 
 */
-
+};
 
 
 #endif

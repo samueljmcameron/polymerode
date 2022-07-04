@@ -1,5 +1,5 @@
-#ifndef GLOBALPARAMS_HPP
-#define GLOBALPARAMS_HPP
+#ifndef BEADRODPMER_GLOBALPARAMS_HPP
+#define BEADRODPMER_GLOBALPARAMS_HPP
 
 #include <fstream>
 #include <set>
@@ -7,17 +7,19 @@
 
 #include "input.hpp"
 
+
+namespace BeadRodPmer {
 class GlobalParams {
 private:
 
   std::set<std::string> pset {"molecules", "steps",
       "timestep", "dump_every", "dump_file"};
   
-  const int default_molecules = 10;
-  const int default_steps = 1000000;
-  const double default_timestep = 0.001;
-  const int default_dump_every = 1000000;
-  const std::string default_dump_file{"dump.trj"};
+  int default_molecules;
+  int default_steps;
+  double default_timestep;
+  int default_dump_every;
+  std::string default_dump_file;
   
 public:
   GlobalParams(std::ifstream&,
@@ -33,5 +35,5 @@ public:
 
   
 };
-
+};
 #endif
