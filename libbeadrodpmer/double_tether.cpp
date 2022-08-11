@@ -707,8 +707,9 @@ void DoubleTether::test_jacob(int mu,double Delta_t,const Eigen::Vector3d & X_of
   return;
 }  
 
-void DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
-				   const Eigen::Vector3d & X_of_t_at_N,double tolerance)
+int DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
+				  const Eigen::Vector3d & X_of_t_at_N,
+				  int itermax,double tolerance)
 {
 
   // set C_mu and dC_mu/dlambda_nu
@@ -724,8 +725,9 @@ void DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t
   negative_tension_change = jacob_solver.solve(constraint_errors);
   
   tension = tension - negative_tension_change;
+  int count = 0;
 
-  while (negative_tension_change.norm() > tolerance) {
+  while (negative_tension_change.norm() > tolerance && count <= itermax) {
 
 
 
@@ -740,9 +742,10 @@ void DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t
 
 
     tension = tension - negative_tension_change;
+    count += 1;
   }
 
-  
+  return count;
 }
 
 

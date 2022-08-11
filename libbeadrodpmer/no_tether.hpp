@@ -28,7 +28,7 @@ public:
   void test_jacob(int,double);  
 
 
-  void correct_tension(double,double tol = 1e-14);
+  int correct_tension(double,int itermax = 20,double tol = 1e-14);
 
 
 

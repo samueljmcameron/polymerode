@@ -1,6 +1,6 @@
 #include "single_tether.hpp"
 #include "input.hpp"
-
+#include <Eigen/Eigenvalues>
 
 #include <iostream>
 #include <cmath>
@@ -596,8 +596,8 @@ void SingleTether::test_jacob(int mu,double Delta_t,const Eigen::Vector3d & X_of
   return;
 }  
 
-void SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
-				   double tolerance)
+int SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_at_1,
+				  int itermax,double tolerance)
 {
 
   // set C_mu and dC_mu/dlambda_nu
@@ -613,24 +613,28 @@ void SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t
   negative_tension_change = jacob_solver.solve(constraint_errors);
   
   tension = tension - negative_tension_change;
+  int count = 0;
 
-  while (negative_tension_change.norm() > tolerance) {
 
-
+  while (negative_tension_change.norm() > tolerance && count <= itermax) {
 
     final_integrate(Delta_t);
     calculate_constraint_errors(X_of_t_at_1);
     update_dCdlambda(Delta_t);
 
-  
+
     jacob_solver.factorize(dCdlambda);
 
+
+    
     negative_tension_change = jacob_solver.solve(constraint_errors);
 
-
+    
     tension = tension - negative_tension_change;
-  }
 
+    count += 1;
+  }
+  return count;
   
 }
 

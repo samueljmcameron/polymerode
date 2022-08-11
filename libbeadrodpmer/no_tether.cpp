@@ -482,7 +482,7 @@ void NoTether::test_jacob(int mu,double Delta_t)
   return;
 }  
 
-void NoTether::correct_tension(double Delta_t,double tolerance)
+int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
 {
 
   // set C_mu and dC_mu/dlambda_nu
@@ -499,7 +499,9 @@ void NoTether::correct_tension(double Delta_t,double tolerance)
   
   tension = tension - negative_tension_change;
 
-  while (negative_tension_change.norm() > tolerance) {
+  int count = 0;
+
+  while (negative_tension_change.norm() > tolerance && count <= itermax) {
 
 
 
@@ -514,8 +516,9 @@ void NoTether::correct_tension(double Delta_t,double tolerance)
 
 
     tension = tension - negative_tension_change;
+    count += 1;
   }
-
+  return count;
   
 }
 

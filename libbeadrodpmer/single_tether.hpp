@@ -30,8 +30,8 @@ public:
   void test_jacob(int,double,const Eigen::Vector3d &);  
 
 
-  void correct_tension(double,const Eigen::Vector3d&,
-		       double tol = 1e-14);
+  int correct_tension(double,const Eigen::Vector3d&,
+		      int itermax = 20, double tol = 1e-14);
 
 
 
