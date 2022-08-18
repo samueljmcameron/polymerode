@@ -92,19 +92,20 @@ void ioVTK::writeVTKcollectionMiddle(const std::string collectionfname,
 				     const double time)
 {
 
-  size_t num_slashes = std::count(collectionfname.begin(), collectionfname.end(), '/');
 
-  std::string prepath = "";
-  for (int i = 0; i < num_slashes; i++)
-    prepath += std::string("../");
-  
+  size_t firstslash = filename.find_last_of("\\/");
+  std::string file_no_path = filename;
+  if (firstslash != std::string::npos) {
+    file_no_path = filename.substr(firstslash+1);
+  }
+
   auto myfile = std::fstream(collectionfname,std::ios_base::app);
   if (not myfile.is_open()) {
     throw std::runtime_error(std::string("Cannot open file ") + collectionfname);
   }
   
   myfile << "<DataSet timestep=\"" << time << "\" group=\"\" part=\"0\""
-	 << " file=\"" << prepath+filename << "\"/>" << std::endl;
+	 << " file=\"" << file_no_path << "\"/>" << std::endl;
 
   myfile.close();
   
@@ -136,14 +137,20 @@ void ioVTK::restartVTKcollection(const std::string fname)
   }
 
 
+
   std::vector<std::string> lines;
   std::string stopline = "";
+  std::getline(oldfile,stopline);
+  lines.push_back(stopline);
 
-  while (stopline != "</Collection>") {
+  while (std::getline(oldfile,stopline) && stopline != "</Collection>") {
     lines.push_back(stopline);
-    std::getline(oldfile,stopline);
   }
   oldfile.close();
+
+  if (stopline != "</Collection>") {
+    throw std::runtime_error("Invalid restart file." );
+  }
 
   
   lines.erase(lines.begin());  
