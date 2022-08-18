@@ -152,8 +152,7 @@ void ioVTK::restartVTKcollection(const std::string fname)
     throw std::runtime_error("Invalid restart file." );
   }
 
-  
-  lines.erase(lines.begin());  
+
 
   auto newfile = std::ofstream(fname);
   if (not newfile.is_open()) {
