@@ -1,6 +1,6 @@
 #include "run.hpp"
 #include "iovtk.hpp"
-
+#include <chrono>
 #include <iostream>
 
 
@@ -36,7 +36,7 @@ void update_beadN(atEnd & beadN,const Eigen::Vector3d &xN,double t)
 
 
 
-void single_step(double & t,BeadRodPmer::DoubleTether & pmer,
+void single_step(double t,BeadRodPmer::DoubleTether & pmer,
 		 atEnd & bead1,atEnd & beadN,const Eigen::Vector3d &x0,
 		 const Eigen::Vector3d &xN,double dt)
 {
@@ -64,11 +64,24 @@ void single_step(double & t,BeadRodPmer::DoubleTether & pmer,
   update_beadN(beadN,xN,t+dt);
   
   pmer.compute_tension(bead1.dXdt,beadN.dXdt);
-  pmer.correct_tension(dt,bead1.X_of_t,beadN.X_of_t,1e-8);
-  pmer.final_integrate(dt);
+
+  int itermax = 20;
   
-  pmer.compute_tangents_and_friction();
-  t += dt;
+  int iterations = pmer.correct_tension(dt,bead1.X_of_t,beadN.X_of_t,itermax,1e-8);
+  if (iterations > itermax) {
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise " << std::endl;
+    for (int i = 0; i < pmer.get_Nbeads(); i++) 
+      pmer.atoms[i].R = pmer.Rtmp[i];
+
+    single_step(t,pmer,bead1,beadN,x0,xN,dt);
+  }
+  else {
+    pmer.final_integrate(dt);
+  
+    pmer.compute_tangents_and_friction();
+  }
+
   return;
 }
 
@@ -110,6 +123,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
   pmer.set_G();
   
   single_step(t,pmer,bead1,beadN,startpoint,endpoint,dt);
+  t += dt;
 
   if (dump_every == 1) {
 
@@ -127,7 +141,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
     std::cout << "t = " << t << std::endl;
 
     single_step(t,pmer,bead1,beadN,startpoint,endpoint,dt);
-    
+    t += dt;
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
@@ -150,7 +164,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 }
 
 
-void single_step(double & t,BeadRodPmer::SingleTether & pmer,
+void single_step(double t,BeadRodPmer::SingleTether & pmer,
 		 atEnd & bead1, const Eigen::Vector3d &x0,double dt)
 {
   pmer.set_unprojected_noise(dt);
@@ -175,11 +189,28 @@ void single_step(double & t,BeadRodPmer::SingleTether & pmer,
 
   
   pmer.compute_tension(bead1.dXdt);
-  pmer.correct_tension(dt,bead1.X_of_t,1e-8);
-  pmer.final_integrate(dt);
+
+
+  int itermax = 20;
   
-  pmer.compute_tangents_and_friction();
-  t += dt;
+  int iterations =   pmer.correct_tension(dt,bead1.X_of_t,itermax,1e-8);
+
+  if (iterations > itermax) {
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise " << std::endl;
+    for (int i = 0; i < pmer.get_Nbeads(); i++) 
+      pmer.atoms[i].R = pmer.Rtmp[i];
+
+    single_step(t,pmer,bead1,x0,dt);
+  }
+  else {
+    pmer.final_integrate(dt);
+  
+    pmer.compute_tangents_and_friction();
+  }
+
+  
+
   return;
 }
 
@@ -216,7 +247,8 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
   pmer.set_Hhat();
   pmer.set_dCdlambda();
   pmer.set_G();
-  single_step(t,pmer,bead1,startpoint,dt);  
+  single_step(t,pmer,bead1,startpoint,dt);
+  t += dt;
 
   if (dump_every == 1) {
 
@@ -232,8 +264,9 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
     std::cout << "t = " << t << std::endl;
-    
-    single_step(t,pmer,bead1,startpoint,dt);  
+
+    single_step(t,pmer,bead1,startpoint,dt);
+    t += dt;
 
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
@@ -257,7 +290,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 }
 
 
-void single_step(double & t, BeadRodPmer::NoTether & pmer,double dt)
+void single_step(double t, BeadRodPmer::NoTether & pmer,double dt)
 {
   pmer.set_unprojected_noise(dt);
   pmer.update_G();
@@ -280,11 +313,26 @@ void single_step(double & t, BeadRodPmer::NoTether & pmer,double dt)
 
   
   pmer.compute_tension();
-  pmer.correct_tension(dt,1e-8);
-  pmer.final_integrate(dt);
+
+  int itermax = 20;
   
-  pmer.compute_tangents_and_friction();
-  t += dt;
+  int iterations =   pmer.correct_tension(dt,itermax,1e-8);
+
+  if (iterations > itermax) {
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise " << std::endl;
+    for (int i = 0; i < pmer.get_Nbeads(); i++) 
+      pmer.atoms[i].R = pmer.Rtmp[i];
+
+    single_step(t,pmer,dt);
+  }
+  else {
+    pmer.final_integrate(dt);
+  
+    pmer.compute_tangents_and_friction();
+  }
+
+  
   return;
 }
 
@@ -319,7 +367,8 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
   pmer.set_Hhat();
   pmer.set_dCdlambda();
   pmer.set_G();
-  single_step(t,pmer,dt);  
+  single_step(t,pmer,dt);
+  t += dt;
 
   if (dump_every == 1) {
 
@@ -336,7 +385,8 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
   for (int i = 2; i <= numsteps; i++) {
     std::cout << "t = " << t << std::endl;
     
-    single_step(t,pmer,dt);  
+    single_step(t,pmer,dt);
+    t += dt;
 
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
