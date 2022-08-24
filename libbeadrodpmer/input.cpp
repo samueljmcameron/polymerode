@@ -88,11 +88,11 @@ namespace input {
 	    throw std::runtime_error("No content ('${}') in input file.");
 	  bool found_key = false;
 	  
-	  for (const auto &[key,value]: varMap) {
-	    if (key == tmp) {
+	  for (const auto &diction: varMap) {
+	    if (diction.first == tmp) {
 	      found_key = true;
 	      raw.erase(vstart,vend - vstart+1);
-	      raw.insert(vstart,value);
+	      raw.insert(vstart,diction.second);
 	    }
 	  }
 	  if (!found_key) {
