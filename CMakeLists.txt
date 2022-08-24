@@ -7,9 +7,19 @@ project(beadrodpmer VERSION 1.0 DESCRIPTION "Single tethered polymer dynamics"
         LANGUAGES CXX)
 
 
-add_compile_options(-O3 -Wall -Wextra -g -Wuninitialized)
+#include(CheckIPOSupported)
+#check_ipo_supported(RESULT supported OUTPUT error)
 
-message("${CMAKE_MODULE_PATH}")
+#if( supported )
+#    message(STATUS "IPO / LTO enabled")
+#    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+#else()
+#	message(STATUS "IPO / LTO not supported: <${error}>")
+#endif()
+
+
+add_compile_options(-flto -fuse-linker-plugin)
+add_link_options(-flto -fuse-linker-plugin)
 
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
