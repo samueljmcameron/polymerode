@@ -1,6 +1,6 @@
 #include "double_tether.hpp"
 #include "input.hpp"
-
+#include "initialise.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -14,13 +14,11 @@ using namespace BeadRodPmer;
 DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
   : Polymer(splitvec)
 {
-
+  
   rhs_of_G.resize(Nbeads+5);
   dummy_for_noise.resize(Nbeads+5);
   Gmunu.resize(Nbeads+5,Nbeads+5);
 
-
-  
 
   rhs_of_Hhat.resize(Nbeads+5);
   tension.resize(Nbeads+5);
@@ -40,7 +38,9 @@ DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
   tDets.resize(Nbeads+3);
   bDets.resize(Nbeads+3);
 
-
+  std::cout << "initiating double tether." << std::endl;
+  
+  Initialise::init_atoms(splitvec,atoms,initspringK,initdt,inittolerance);
   
 }
 
@@ -53,8 +53,131 @@ DoubleTether::~DoubleTether()
 
 
 
+void DoubleTether::single_step(double t, double dt,
+			       const std::vector<std::vector<double>> &dFdX_i,
+			       int itermax, int numtries)
+{
+
+  // get here if this step has been restarted numtry times
+  if (numtries == 0)
+    throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
+
+  
+  set_unprojected_noise(dt);
+  update_G();
+  update_Hhat();
+  compute_noise();
+  compute_effective_kappa();
+  compute_uc_forces();
+  
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+
+  
+  compute_tension({0,0,0},{0,0,0});
+  initial_integrate(dt);
+  
+
+  
+  update_Hhat();
+  compute_effective_kappa();
+  compute_uc_forces();
+
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+  
+  
+  compute_tension({0,0,0},{0,0,0});
+  
+  int iterations = correct_tension(dt,atoms[0].R,
+				   atoms[get_Nbeads()-1].R,
+				   itermax,1e-8);
 
 
+
+  if (iterations > itermax) {
+    numtries -= 1;
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise ( " << numtries 
+	      << " attempts left). " << std::endl;
+    for (int i = 0; i < get_Nbeads(); i++) 
+      atoms[i].R = Rtmp[i];
+
+    single_step(t,dt,dFdX_i,itermax,numtries);
+  }  else {
+    final_integrate(dt);
+  
+    compute_tangents_and_friction();
+  }
+
+  return;
+  
+
+}
+
+
+void DoubleTether::single_step(double t,double dt,
+			       const std::vector<std::vector<double>> & dFdX_i,
+			       std::function<Eigen::Vector3d (double)> X0_t,
+			       std::function<Eigen::Vector3d (double)> XN_t,
+			       std::function<Eigen::Vector3d (double)> dX0dt,
+			       std::function<Eigen::Vector3d (double)> dXNdt,
+			       int itermax, int numtries)
+{
+
+  // get here if this step has been restarted numtry times
+  if (numtries == 0)
+    throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
+
+  
+  set_unprojected_noise(dt);
+  update_G();
+  update_Hhat();
+  compute_noise();
+  compute_effective_kappa();
+  compute_uc_forces();
+  
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+
+  
+  compute_tension(dX0dt(t+dt/2),dXNdt(t+dt/2));
+  initial_integrate(dt);
+  
+
+  
+  update_Hhat();
+  compute_effective_kappa();
+  compute_uc_forces();
+
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+  
+  
+  compute_tension(dX0dt(t+dt),dXNdt(t+dt));
+  
+  int iterations = correct_tension(dt,X0_t(t+dt),XN_t(t+dt),
+				   itermax,1e-8);
+
+
+
+  if (iterations > itermax) {
+    numtries -= 1;
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise ( " << numtries 
+	      << " attempts left). " << std::endl;
+    for (int i = 0; i < get_Nbeads(); i++) 
+      atoms[i].R = Rtmp[i];
+
+    single_step(t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries);
+  }  else {
+    final_integrate(dt);
+  
+    compute_tangents_and_friction();
+  }
+
+  return;
+}
 
 
 /* ---------------------------------------------------------------------------- */

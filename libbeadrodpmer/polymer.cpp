@@ -7,53 +7,13 @@
 #include <stdexcept>
 
 
-#define SMALL 1e-14
-
 namespace BeadRodPmer {
-namespace gramschmidt {
-  void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
-		   Eigen::Vector3d& ez)
-  {
-    
-    
-    
-    if (std::abs(std::abs(ey.dot(ez))-std::abs(ey.dot(ey))) < SMALL) {
-      ey(0) += 0.1;
-      ey(1) += -0.2;
-      ey(3) += 0.3;
-      ey = ey/sqrt(ey.dot(ey));
-    }
-    
-    if (std::abs(std::abs(x1.dot(ey))-std::abs(x1.dot(x1))) < SMALL) {
-      ey(0) += 0.1;
-      ey(1) += -0.2;
-      ey(3) += 0.3;
-      ey = ey/sqrt(ey.dot(ey));
-    } else if (std::abs(std::abs(x1.dot(ez))-std::abs(x1.dot(x1))) < SMALL) {
-      ez(0) += -0.3;
-      ez(1) += 0.12;
-      ez(3) += -0.5;
-      ez = ez/sqrt(ez.dot(ez));
-    }
-    
-    // Proceed to orthonormalise
-    
-    ey = ey - ey.dot(x1)*x1;
-    ey = ey/sqrt(ey.dot(ey));
-    
-    ez = ez - ez.dot(ey)*ey - ez.dot(x1)*x1;
-    ez = ez/sqrt(ez.dot(ez));
-    
-    return;
-    
-  }
-}
- 
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
 Polymer::Polymer(const std::vector<std::string> & splitvec)
-  : gen(0), dist(-0.5,0.5)
+  : gen(0), dist(-0.5,0.5), flag_x0(false),flag_xN(false),
+    flag_initdoubleteth(false)
 {
 
 
@@ -82,14 +42,27 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
     } else if (splitvec[iarg] == "bending") {
       input::isDouble(splitvec[iarg+1],kappa,splitvec[iarg]);
       iarg += 2;
-    } else if (splitvec[iarg] == "initialise") {
+    } else if (splitvec[iarg] == "x0") {
       input::isDouble(splitvec[iarg+1],x0(0),splitvec[iarg]);
       input::isDouble(splitvec[iarg+2],x0(1),splitvec[iarg]);
       input::isDouble(splitvec[iarg+3],x0(2),splitvec[iarg]);
+      flag_x0 = true;
+      iarg += 4;
+    } else if (splitvec[iarg] == "xN") {
+      input::isDouble(splitvec[iarg+1],xN(0),splitvec[iarg]);
+      input::isDouble(splitvec[iarg+2],xN(1),splitvec[iarg]);
+      input::isDouble(splitvec[iarg+3],xN(2),splitvec[iarg]);
+      flag_xN = true;
       iarg += 4;
     } else if (splitvec[iarg] == "seed") {
       input::isInt(splitvec[iarg+1],seed,splitvec[iarg]);
       iarg += 2;
+    } else if (splitvec[iarg] == "init_ends") {
+      input::isDouble(splitvec[iarg+1],initspringK,splitvec[iarg]);
+      input::isDouble(splitvec[iarg+2],initdt,splitvec[iarg]);
+      input::isDouble(splitvec[iarg+3],inittolerance,splitvec[iarg]);
+      flag_initdoubleteth = true;
+      iarg += 4;
     } else if (splitvec[iarg] == "nuc_beads") {
       input::isInt(splitvec[iarg+1],number_of_nuc_beads,splitvec[iarg]);
       nuc_beads.resize(number_of_nuc_beads);
@@ -100,6 +73,14 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
       throw std::runtime_error("Error: invalid argument for build_polymer.");
     }
   }
+
+
+  if (!flag_x0) 
+    throw std::runtime_error("Need to specify x0 for polymer.");
+  if (!flag_xN) 
+    throw std::runtime_error("Need to specify xN for polymer.");
+  if (!flag_initdoubleteth) 
+    throw std::runtime_error("Need to specify initialisation tolerance for polymer.");
     
   atoms = std::vector<Atom> (Nbeads);
   bonds = std::vector<Bond>(Nbeads-1);
@@ -111,7 +92,6 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
   end_inverses.resize(6);
   gen.seed(seed);
 
-  init_atoms();
 
   
 }
@@ -124,79 +104,7 @@ Polymer::~Polymer()
 }
 
 
-/* -------------------------------------------------------------------------- */
-/* Call to set configuration to a straight rod along x axis. */
-/* -------------------------------------------------------------------------- */
-void Polymer::init_atoms()
-{
 
-  Eigen::Vector3d u(1,0,0);
-  Eigen::Vector3d v(0,1,0);
-  Eigen::Vector3d w(0,0,1);
-
-  Eigen::Vector3d diffbasis(0,0,0);
-  
-  double tmp,swich;
-  double dum;
-
-  for (int mu = 0; mu < Nbeads-1; mu++) {
-
-    if (mu > 0) {
-      gramschmidt::gramschmidt(u,v,w); // redundant in first iteration
-    }
-
-    diffbasis(0) = 2*dist(gen);
-    
-    tmp = 1-diffbasis(0)*diffbasis(0);
-    if (tmp > SMALL) {
-      dum = dist(gen);
-      diffbasis(1) = 2*dum*sqrt(tmp);
-
-      swich = dist(gen);
-      
-      dum = tmp - diffbasis(1)*diffbasis(1);
-
-
-      
-      if (swich > 0) {
-	
-	diffbasis(2) = sqrt(tmp - diffbasis(1)*diffbasis(1));
-      } else {
-	diffbasis(2) = -1*sqrt(tmp - diffbasis(1)*diffbasis(1));
-      }
-      
-      
-    } else {
-      diffbasis(1) = diffbasis(2) = 0;
-    }
-    
-    bonds[mu].rod(0) = diffbasis(0)*u(0) + diffbasis(1)*v(0) + diffbasis(2)*w(0);
-    bonds[mu].rod(1) = diffbasis(0)*u(1) + diffbasis(1)*v(1) + diffbasis(2)*w(1);
-    bonds[mu].rod(2) = diffbasis(0)*u(2) + diffbasis(1)*v(2) + diffbasis(2)*w(2);
-    
-    u = bonds[mu].rod;
-
-  
-  }
-
-  
-  atoms[0].R(0) = x0(0);
-  atoms[0].R(1) = x0(1);
-
-  atoms[0].R(2) = x0(2);
-
-
-  for (int mu = 0; mu< Nbeads-1; mu++) {
-    atoms[mu+1].R = atoms[mu].R + bondlength*bonds[mu].rod;
-  }
-
-  xN(0) = atoms[Nbeads-1].R(0);
-  xN(1) = atoms[Nbeads-1].R(1);
-  xN(2) = atoms[Nbeads-1].R(2);
-    
-  return;
-
-}
 
 
 
@@ -558,5 +466,15 @@ double Polymer::get_timescale(double dt) const
   return dt*temp/(bondlength*zperp);
 }
 
-};
 
+
+Eigen::Vector3d Polymer::get_x0() const
+{
+  return x0;
+}
+
+Eigen::Vector3d Polymer::get_xN() const
+{
+  return xN;
+}
+};

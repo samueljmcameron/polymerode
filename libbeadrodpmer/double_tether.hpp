@@ -14,13 +14,24 @@ public:
   double omega, rad;
 
 
-  
 
+  void single_step(double , double ,
+		   const std::vector<std::vector<double>> & ,
+		   int itermax = 20,int numtries = 5);
+ 
+
+  void single_step(double , double ,
+		   const std::vector<std::vector<double>> & ,
+		   std::function<Eigen::Vector3d (double)>,
+		   std::function<Eigen::Vector3d (double)>,
+		   std::function<Eigen::Vector3d (double)>,
+		   std::function<Eigen::Vector3d (double)>,
+		   int itermax = 20, int numtries = 5);
 
   void set_G();
   void update_G();
 
-
+  void init_atoms(const std::vector<std::string> &);
   
   void set_Hhat();
   void update_Hhat();

@@ -11,7 +11,7 @@ target_include_directories(beadrodpmer
 target_link_libraries(beadrodpmer PUBLIC Eigen3::Eigen)
 
 
-set_target_properties(beadrodpmer PROPERTIES PUBLIC_HEADER "atom.hpp;bond.hpp;double_tether.hpp;globalparams.hpp;input.hpp;iovtk.hpp;iovtk.tpp;matrix.hpp;no_tether.hpp;polymer.hpp;single_tether.hpp")
+set_target_properties(beadrodpmer PROPERTIES PUBLIC_HEADER "atom.hpp;bond.hpp;double_tether.hpp;globalparams.hpp;input.hpp;iovtk.hpp;iovtk.tpp;matrix.hpp;no_tether.hpp;polymer.hpp;single_tether.hpp;initialise.hpp")
 
 
 #set(LIB_HEADERS atom.hpp bond.hpp double_tether.hpp globalparams.hpp input.hpp iovtk.hpp iovtk.tpp

@@ -12,6 +12,14 @@ public:
   ~NoTether();  
 
 
+
+  void single_step(double, double,
+		   const std::vector<std::vector<double>> &,
+		   int itermax = 20, int numtries = 5);
+
+  
+  void init_atoms();
+  
   void set_G();
   void update_G();
 

@@ -27,7 +27,6 @@ public:
   ~Polymer();  
 
 
-  virtual void init_atoms();
   void compute_tangents_and_friction();
   void set_unprojected_noise(double);
   void compute_uc_forces();
@@ -42,6 +41,9 @@ public:
   double get_zperp() const;
   double get_bondlength() const;
   double get_timescale(double) const;
+
+  Eigen::Vector3d get_x0() const;
+  Eigen::Vector3d get_xN() const;
 
   std::vector<Atom> atoms;
   std::vector<Bond> bonds;
@@ -73,7 +75,7 @@ public:
 
   Eigen::SparseLU< SpMat > jacob_solver;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
-
+  
   
 protected:
   int Nbeads;           // number of polymer beads
@@ -82,9 +84,15 @@ protected:
   double zperp;         // perpendicular coefficient of friction
   double temp;
   double kappa;         // bare bending energy
+
+  double initspringK;   // spring constant for initializing double tether
+  double initdt;        // time step for initializing double tether
+  double inittolerance; // how far from specified tether is acceptable when
+                                  //  initializing double tether
   
   Eigen::Vector3d x0,xN;         // location of tethered bead
-  
+
+  bool flag_x0, flag_xN, flag_initdoubleteth;
 
   std::mt19937 gen;
 

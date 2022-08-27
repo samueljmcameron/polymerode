@@ -1,12 +1,10 @@
 #include "single_tether.hpp"
 #include "input.hpp"
-#include <Eigen/Eigenvalues>
+#include "initialise.hpp"
 
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
-
-#define SMALL 1e-14
 
 
 using namespace BeadRodPmer;
@@ -17,7 +15,11 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
   : Polymer(splitvec)
 {
 
+  if (!flag_x0) 
+    throw std::runtime_error("Need to specify x0 for single tether polymer.");
 
+
+  
   rhs_of_G.resize(Nbeads+2);
   dummy_for_noise.resize(Nbeads+2);
   Gmunu.resize(Nbeads+2,Nbeads+2);
@@ -44,7 +46,8 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
   bDets.resize(Nbeads+3);
 
   end_inverses.setZero();
-  
+
+  Initialise::init_atoms(splitvec,atoms,initspringK,initdt,inittolerance);  
 }
 
 /* -------------------------------------------------------------------------- */
@@ -53,6 +56,124 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
 SingleTether::~SingleTether()
 {
 }
+
+void SingleTether::single_step(double t,double dt,
+			       const std::vector<std::vector<double>> & dFdX_i,
+			       int itermax, int numtries)
+{
+
+  // get here if this step has been restarted numtry times
+
+  if (numtries == 0) 
+    throw std::runtime_error("could not solve constraint equation for single tethered polymer.");
+
+  
+  set_unprojected_noise(dt);
+  update_G();
+  update_Hhat();
+  compute_noise();
+  compute_effective_kappa();
+  compute_uc_forces();
+
+  for (int index = 0; index < nuc_beads.size(); index ++ ) 
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+
+  compute_tension({0,0,0});
+  initial_integrate(dt);
+  
+
+  update_Hhat();
+  compute_effective_kappa();
+  compute_uc_forces();
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+
+  
+  compute_tension({0,0,0});
+
+  
+  int iterations = correct_tension(dt,atoms[0].R,itermax,1e-8);
+  if (iterations > itermax) {
+    numtries -= 1;
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise ( " << numtries 
+	      << " attempts left). " << std::endl;
+    for (int i = 0; i < get_Nbeads(); i++) 
+      atoms[i].R = Rtmp[i];
+
+
+    single_step(t,dt,dFdX_i,itermax,numtries);
+  }
+  else {
+    final_integrate(dt);
+  
+    compute_tangents_and_friction();
+  }
+
+  return;
+}
+
+
+
+void SingleTether::single_step(double t,double dt,
+			       const std::vector<std::vector<double>> & dFdX_i,
+			       std::function<Eigen::Vector3d (double)> X0_t,
+			       std::function<Eigen::Vector3d (double)> dX0dt,
+			       int itermax, int numtries)
+{
+
+  // get here if this step has been restarted numtry times
+  if (numtries == 0)
+    throw std::runtime_error("could not solve constraint equation for single tethered polymer.");
+
+  
+  set_unprojected_noise(dt);
+  update_G();
+  update_Hhat();
+  compute_noise();
+  compute_effective_kappa();
+  compute_uc_forces();
+
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+
+
+  compute_tension(dX0dt(t+dt/2));
+  initial_integrate(dt);
+  
+
+  update_Hhat();
+  compute_effective_kappa();
+  compute_uc_forces();
+  for (int index = 0; index < nuc_beads.size(); index ++ )
+    add_external_force(dFdX_i[index],nuc_beads[index]);
+
+  
+  compute_tension(dX0dt(t+dt));
+
+  
+  int iterations = correct_tension(dt,X0_t(t+dt),itermax,1e-8);
+  if (iterations > itermax) {
+    numtries -= 1;
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise ( " << numtries 
+	      << " attempts left). " << std::endl;
+    for (int i = 0; i < get_Nbeads(); i++) 
+      atoms[i].R = Rtmp[i];
+
+
+    single_step(t,dt,dFdX_i,X0_t,dX0dt,itermax,numtries);
+  }
+  else {
+    final_integrate(dt);
+  
+    compute_tangents_and_friction();
+  }
+
+  return;
+}
+
+
 
 
 /* ---------------------------------------------------------------------------- */
