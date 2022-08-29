@@ -53,14 +53,18 @@ DoubleTether::~DoubleTether()
 
 
 
-void DoubleTether::single_step(double t, double dt,
-			       const std::vector<std::vector<double>> &dFdX_i,
-			       int itermax, int numtries)
+int DoubleTether::single_step(double t, double dt,
+			      const std::vector<std::vector<double>> &dFdX_i,
+			      int itermax, int numtries,bool throw_exception)
 {
 
   // get here if this step has been restarted numtry times
-  if (numtries == 0)
-    throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
+  if (numtries == 0) {
+    if (throw_exception)
+      throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
+    else
+      return -1;
+  }
 
   
   set_unprojected_noise(dt);
@@ -110,24 +114,28 @@ void DoubleTether::single_step(double t, double dt,
     compute_tangents_and_friction();
   }
 
-  return;
+  return 0;
   
 
 }
 
 
-void DoubleTether::single_step(double t,double dt,
-			       const std::vector<std::vector<double>> & dFdX_i,
-			       std::function<Eigen::Vector3d (double)> X0_t,
-			       std::function<Eigen::Vector3d (double)> XN_t,
-			       std::function<Eigen::Vector3d (double)> dX0dt,
-			       std::function<Eigen::Vector3d (double)> dXNdt,
-			       int itermax, int numtries)
+int DoubleTether::single_step(double t,double dt,
+			      const std::vector<std::vector<double>> & dFdX_i,
+			      std::function<Eigen::Vector3d (double)> X0_t,
+			      std::function<Eigen::Vector3d (double)> XN_t,
+			      std::function<Eigen::Vector3d (double)> dX0dt,
+			      std::function<Eigen::Vector3d (double)> dXNdt,
+			      int itermax, int numtries,bool throw_exception)
 {
 
   // get here if this step has been restarted numtry times
-  if (numtries == 0)
-    throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
+  if (numtries == 0) {
+    if (throw_exception)
+      throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
+    else
+      return -1;
+  }
 
   
   set_unprojected_noise(dt);
@@ -176,7 +184,7 @@ void DoubleTether::single_step(double t,double dt,
     compute_tangents_and_friction();
   }
 
-  return;
+  return 0;
 }
 
 

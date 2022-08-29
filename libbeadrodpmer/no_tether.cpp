@@ -12,7 +12,8 @@ namespace BeadRodPmer {
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-NoTether::NoTether(const std::vector<std::string> & splitvec)
+NoTether::NoTether(const std::vector<std::string> & splitvec,
+		   bool line_initial_condition)
   : Polymer(splitvec)
 {
 
@@ -44,7 +45,10 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
 
   end_inverses.setZero();
 
-  init_atoms();
+  if (line_initial_condition)
+    init_atoms_line();
+  else
+    init_atoms_rand();
 
 }
 
@@ -59,14 +63,18 @@ NoTether::~NoTether()
 
 
 
-void NoTether::single_step(double t, double dt,
-			   const std::vector<std::vector<double>> & dFdX_i,
-			   int itermax, int numtries)
+int NoTether::single_step(double t, double dt,
+			  const std::vector<std::vector<double>> & dFdX_i,
+			  int itermax, int numtries,bool throw_exception)
 {
 
   // get here if this step has been restarted numtry times
-  if (numtries == 0)
-    throw std::runtime_error("could not solve constraint equation for no tether polymer.");
+  if (numtries == 0) {
+    if (throw_exception)
+      throw std::runtime_error("could not solve constraint equation for no tether polymer.");
+    else
+      return -1;
+  }
 
   
   set_unprojected_noise(dt);
@@ -113,7 +121,7 @@ void NoTether::single_step(double t, double dt,
     compute_tangents_and_friction();
   }
 
-  return;
+  return 0;
 }
 
 
@@ -804,7 +812,7 @@ void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
 /* -------------------------------------------------------------------------- */
 /* Call to set random configuration. */
 /* -------------------------------------------------------------------------- */
-void NoTether::init_atoms()
+void NoTether::init_atoms_rand()
 {
 
   Eigen::Vector3d u(1,0,0);
@@ -884,6 +892,24 @@ void NoTether::init_atoms()
   return;
 
 }
+
+/* -------------------------------------------------------------------------- */
+/* Call to set line configuration so that polymer intersects initial points
+   x0 and xN with same centre of mass as the initial points. */
+/* -------------------------------------------------------------------------- */
+void NoTether::init_atoms_line()
+{
+
+  double length_init = (xN-x0).norm();
+  
+  double t1 = 0.5*(1-(Nbeads-1)*bondlength/length_init);
+  for (int i = 0 i < Nbeads; i++) {
+    atoms[i].R = x0 + (xN-x0)*(t1+i*bondlength/length_init);
+    
+  return;
+
+}
+
 
 
 }

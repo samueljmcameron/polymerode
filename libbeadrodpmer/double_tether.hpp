@@ -15,19 +15,21 @@ public:
 
 
 
-  void single_step(double , double ,
-		   const std::vector<std::vector<double>> & ,
-		   int itermax = 20,int numtries = 5);
+  int single_step(double , double ,
+		  const std::vector<std::vector<double>> & ,
+		  int itermax = 20,int numtries = 5,
+		  bool throw_exception = true);
  
 
-  void single_step(double , double ,
-		   const std::vector<std::vector<double>> & ,
-		   std::function<Eigen::Vector3d (double)>,
-		   std::function<Eigen::Vector3d (double)>,
-		   std::function<Eigen::Vector3d (double)>,
-		   std::function<Eigen::Vector3d (double)>,
-		   int itermax = 20, int numtries = 5);
-
+  int single_step(double , double ,
+		  const std::vector<std::vector<double>> & ,
+		  std::function<Eigen::Vector3d (double)>,
+		  std::function<Eigen::Vector3d (double)>,
+		  std::function<Eigen::Vector3d (double)>,
+		  std::function<Eigen::Vector3d (double)>,
+		  int itermax = 20, int numtries = 5,
+		  bool throw_exception = true);
+  
   void set_G();
   void update_G();
 

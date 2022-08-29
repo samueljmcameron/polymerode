@@ -8,17 +8,20 @@ namespace BeadRodPmer {
 class NoTether : public Polymer {
 public:
   // constructor
-  NoTether(const std::vector<std::string> &);
+  NoTether(const std::vector<std::string> &,
+	   bool line_initial_condition=false);
   ~NoTether();  
 
 
 
-  void single_step(double, double,
-		   const std::vector<std::vector<double>> &,
-		   int itermax = 20, int numtries = 5);
+  int single_step(double, double,
+		  const std::vector<std::vector<double>> &,
+		  int itermax = 20, int numtries = 5,
+		  bool throw_exception=true);
 
   
-  void init_atoms();
+  void init_atoms_rand();
+  void init_atoms_line();
   
   void set_G();
   void update_G();
