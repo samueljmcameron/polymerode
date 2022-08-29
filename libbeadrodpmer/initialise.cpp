@@ -1,5 +1,6 @@
 #include "no_tether.hpp"
 #include <Eigen/Core>
+#include <iostream>
 
 namespace BeadRodPmer {
 namespace Initialise {
@@ -11,15 +12,18 @@ namespace Initialise {
 /* -------------------------------------------------------------------------- */
 
 void init_atoms(const std::vector<std::string> & splitvec,
-		std::vector<Atom> &atoms_to_set, double springK,
-		double dt, double tolerance)
+		std::vector<Atom> &atoms_to_set,
+		Eigen::Vector3d &x0, Eigen::Vector3d &xN,
+		double springK,double dt, double tolerance,
+		int bufsteps)
 {
 
   
   BeadRodPmer::NoTether pmer(splitvec,true);
 
-  Eigen::Vector3d x0 = pmer.get_x0();
-  Eigen::Vector3d xN = pmer.get_xN();
+  if ((x0 - pmer.get_x0()).norm() > 1e-8 ||
+      (xN - pmer.get_xN()).norm() > 1e-8) 
+    throw std::runtime_error("SOMething is very wrong!!!!!");
   
 
   if ((x0-xN).norm() > pmer.get_bondlength()*(pmer.get_Nbeads()-1))
@@ -75,7 +79,7 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
   
   while ((pmer.atoms[b_index].R-xN).norm() > tolerance
-	 || (pmer.atoms[0].R-x0).norm() > tolerance) {
+	 || (pmer.atoms[0].R-x0).norm() > tolerance || t < bufsteps*dt) {
 
 
     dFdX_is[0][0] = springK*(pmer.atoms[0].R(0)-x0(0));
@@ -96,6 +100,14 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
   for (int index = 0; index < pmer.get_Nbeads(); index ++ ) 
     atoms_to_set.at(index).R = pmer.atoms[index].R;
+
+  std::cout << "Reached time t = " << t << " for setting up double tether. " << std::endl;
+
+  // MUST RESET x0 and xN after doing this, or else code will break as
+  // any tolerance errors in init_atoms will mean that R_1 != x0 and R_N != XN
+  x0 = atoms_to_set.at(0).R;
+  xN = atoms_to_set.at(pmer.get_Nbeads()-1).R;
+
   
   return;
   
