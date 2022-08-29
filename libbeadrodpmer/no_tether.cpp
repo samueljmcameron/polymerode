@@ -46,7 +46,7 @@ NoTether::NoTether(const std::vector<std::string> & splitvec,
   end_inverses.setZero();
 
   if (line_initial_condition)
-    init_atoms_line();
+    init_atoms_caret();
   else
     init_atoms_rand();
 
@@ -903,13 +903,89 @@ void NoTether::init_atoms_line()
   double length_init = (xN-x0).norm();
   
   double t1 = 0.5*(1-(Nbeads-1)*bondlength/length_init);
-  for (int i = 0 i < Nbeads; i++) {
+  for (int i = 0; i < Nbeads; i++) 
     atoms[i].R = x0 + (xN-x0)*(t1+i*bondlength/length_init);
     
   return;
 
 }
 
+void NoTether::init_atoms_caret()
+{
 
+
+  
+  Eigen::Vector3d nhat;
+
+  nhat(0) = 2*dist(gen);
+  nhat(1) = 2*dist(gen);
+  nhat(2) = 2*dist(gen);
+  
+  Eigen::Vector3d dd = xN-x0;
+
+  if (dd.norm() < SMALL) {
+    std::cerr << "Warning, end points of polymer are too close together to "
+	      << "make a caret configuration. Switching to a random configuration."
+	      << std::endl;
+    init_atoms_rand();
+    
+    return;
+    
+  }
+
+  if (std::abs(dd(2)) < SMALL) {
+    if (std::abs(dd(1)) < SMALL) {
+      nhat(0) = 0;
+      // loop here is to ensure that not all components of normal vector are zero
+      while (std::abs(nhat(1)) < SMALL) {
+	nhat(1) = 2*dist(gen);
+      }
+    } else {
+      nhat(1) = -nhat(0)*dd(0)/dd(1);
+    }
+  } else {
+    nhat(2) = -(nhat(1)*dd(1) + nhat(0)*dd(0))/dd(2);
+  }
+
+  nhat = nhat/nhat.norm();
+
+
+  double fakelength;
+
+
+  // since the parameterisation only works for an odd number of beads, we overshoot
+  // the point x0 for an even number of beads by pretending the system only has
+  // Nbeads-1 beads, so the final bead gets put past the point x0
+  if (Nbeads % 2 == 0) {
+    fakelength = (Nbeads-2)*bondlength;
+  } else {
+    fakelength = (Nbeads-1)*bondlength;
+  }
+  
+
+  double gamma = 0.5*sqrt(fakelength*fakelength-dd.squaredNorm());
+
+  Eigen::Vector3d alpha = 0.5*dd+gamma*nhat;
+  Eigen::Vector3d beta = -0.5*dd+gamma*nhat;
+
+
+  double tp = 0;
+  double dtp = 1.0*bondlength/fakelength;
+
+  
+  for (int i = 0; i < Nbeads; i++) {
+    
+    tp = i*dtp;
+
+    // integer division rounds toward zero
+    if (i < Nbeads/2) {
+      atoms[i].R = x0 + 2*alpha*tp;
+    } else {
+      atoms[i].R = xN + 2*beta*(1-tp);
+    }
+  }
+  return;
+
+}
 
 }

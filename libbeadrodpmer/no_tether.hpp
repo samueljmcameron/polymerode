@@ -22,6 +22,7 @@ public:
   
   void init_atoms_rand();
   void init_atoms_line();
+  void init_atoms_caret();
   
   void set_G();
   void update_G();
