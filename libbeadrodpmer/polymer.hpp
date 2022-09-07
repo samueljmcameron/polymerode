@@ -52,7 +52,9 @@ public:
 
   
   std::vector<int> nuc_beads;
-
+  std::vector<double> nuc_strengths;
+  std::vector<double> nuc_maxs;
+  std::vector<double> nuc_widths;
 
   SpMat Gmunu;      // geometric tensor
   Eigen::VectorXd rhs_of_G;  // rhs_of_G vector

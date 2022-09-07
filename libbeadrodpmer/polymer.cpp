@@ -20,7 +20,10 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
   int nargs = splitvec.size();
   int iarg = 0;
 
-  int number_of_nuc_beads;
+  int number_of_nuc_beads = 0;
+  int number_of_nuc_strengths = 0;
+  int number_of_nuc_maxs = 0;
+  int number_of_nuc_widths = 0;
   int seed;
   
   while (iarg < nargs) {
@@ -69,6 +72,24 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
       for (int i = 1; i <= number_of_nuc_beads; i++) 
 	input::isInt(splitvec[iarg+1+i],nuc_beads[i-1],splitvec[iarg]);
       iarg += number_of_nuc_beads+2;
+    } else if (splitvec[iarg] == "nuc_strengths") {
+      input::isInt(splitvec[iarg+1],number_of_nuc_strengths,splitvec[iarg]);
+      nuc_strengths.resize(number_of_nuc_strengths);
+      for (int i = 1; i <= number_of_nuc_strengths; i++) 
+	input::isInt(splitvec[iarg+1+i],nuc_strengths[i-1],splitvec[iarg]);
+      iarg += number_of_nuc_strengths+2;
+    } else if (splitvec[iarg] == "nuc_maxs") {
+      input::isInt(splitvec[iarg+1],number_of_nuc_maxs,splitvec[iarg]);
+      nuc_maxs.resize(number_of_nuc_maxs);
+      for (int i = 1; i <= number_of_nuc_maxs; i++) 
+	input::isInt(splitvec[iarg+1+i],nuc_maxs[i-1],splitvec[iarg]);
+      iarg += number_of_nuc_maxs+2;
+    } else if (splitvec[iarg] == "nuc_widths") {
+      input::isInt(splitvec[iarg+1],number_of_nuc_widths,splitvec[iarg]);
+      nuc_widths.resize(number_of_nuc_widths);
+      for (int i = 1; i <= number_of_nuc_widths; i++) 
+	input::isInt(splitvec[iarg+1+i],nuc_widths[i-1],splitvec[iarg]);
+      iarg += number_of_nuc_widths+2;
     } else {
       throw std::runtime_error("Error: invalid argument for build_polymer.");
     }
@@ -81,6 +102,22 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
     throw std::runtime_error("Need to specify xN for polymer.");
   if (!flag_initdoubleteth) 
     throw std::runtime_error("Need to specify initialisation tolerance for polymer.");
+
+  if   (number_of_nuc_beads != number_of_nuc_strengths)
+    throw std::runtime_error("Error: need same number of nuc_beads as nuc_strengths.");
+  if   (number_of_nuc_beads != number_of_nuc_maxs)
+    throw std::runtime_error("Error: need same number of nuc_beads as nuc_maxs.");
+  if   (number_of_nuc_beads != number_of_nuc_widths)
+    throw std::runtime_error("Error: need same number of nuc_beads as nuc_widths.");
+  if   (number_of_nuc_strengths != number_of_nuc_maxs)
+    throw std::runtime_error("Error: need same number of nuc_strengths as nuc_maxs.");
+  if   (number_of_nuc_strengths != number_of_nuc_widths)
+    throw std::runtime_error("Error: need same number of nuc_strengths as nuc_widths.");
+  if   (number_of_nuc_maxs != number_of_nuc_widths)
+    throw std::runtime_error("Error: need same number of nuc_maxs as nuc_widths.");  
+
+  
+  
     
   atoms = std::vector<Atom> (Nbeads);
   bonds = std::vector<Bond>(Nbeads-1);
