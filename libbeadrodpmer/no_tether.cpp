@@ -114,7 +114,7 @@ int NoTether::single_step(double t, double dt,
       atoms[i].R = Rtmp[i];
 
 
-    single_step(t,dt,dFdX_i,itermax,numtries);
+    single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
   } else {
     final_integrate(dt);
   

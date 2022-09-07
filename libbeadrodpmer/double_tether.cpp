@@ -60,7 +60,7 @@ int DoubleTether::single_step(double t, double dt,
 
   // get here if this step has been restarted numtry times
   if (numtries == 0) {
-    if (throw_exception)
+    if (throw_exception) 
       throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
     else
       return -1;
@@ -107,7 +107,7 @@ int DoubleTether::single_step(double t, double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       atoms[i].R = Rtmp[i];
 
-    single_step(t,dt,dFdX_i,itermax,numtries);
+    single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
   }  else {
     final_integrate(dt);
   
@@ -177,7 +177,7 @@ int DoubleTether::single_step(double t,double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       atoms[i].R = Rtmp[i];
 
-    single_step(t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries);
+    single_step(t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
   }  else {
     final_integrate(dt);
   
