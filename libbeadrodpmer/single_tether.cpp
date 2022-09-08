@@ -107,7 +107,7 @@ int SingleTether::single_step(double t,double dt,
       atoms[i].R = Rtmp[i];
 
 
-    single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
+    return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
   }
   else {
     final_integrate(dt);
@@ -171,7 +171,7 @@ int SingleTether::single_step(double t,double dt,
       atoms[i].R = Rtmp[i];
 
 
-    single_step(t,dt,dFdX_i,X0_t,dX0dt,itermax,numtries,throw_exception);
+    return single_step(t,dt,dFdX_i,X0_t,dX0dt,itermax,numtries,throw_exception);
   }
   else {
     final_integrate(dt);

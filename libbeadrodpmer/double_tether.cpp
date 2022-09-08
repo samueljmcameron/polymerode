@@ -40,7 +40,7 @@ DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
 
   std::cout << "initiating double tether." << std::endl;
   
-  Initialise::init_atoms(splitvec,atoms,x0,xN,initspringK,initdt,inittolerance);
+  Initialise::init_atoms(splitvec,atoms,x0,xN,initspringK,initdt,inittolerance,0);
   
 }
 
@@ -62,7 +62,7 @@ int DoubleTether::single_step(double t, double dt,
   if (numtries == 0) {
     if (throw_exception) 
       throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
-    else
+    else 
       return -1;
   }
 
@@ -107,7 +107,7 @@ int DoubleTether::single_step(double t, double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       atoms[i].R = Rtmp[i];
 
-    single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
+    return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
   }  else {
     final_integrate(dt);
   
@@ -133,7 +133,7 @@ int DoubleTether::single_step(double t,double dt,
   if (numtries == 0) {
     if (throw_exception)
       throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
-    else
+    else 
       return -1;
   }
 
@@ -177,7 +177,7 @@ int DoubleTether::single_step(double t,double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       atoms[i].R = Rtmp[i];
 
-    single_step(t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
+    return single_step(t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
   }  else {
     final_integrate(dt);
   
