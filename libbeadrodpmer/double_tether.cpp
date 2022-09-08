@@ -40,7 +40,7 @@ DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
 
   std::cout << "initiating double tether." << std::endl;
   
-  Initialise::init_atoms(splitvec,atoms,x0,xN,initspringK,initdt,inittolerance,0);
+  Initialise::init_atoms(splitvec,atoms,x0,xN,initspringK,initdt,inittolerance);
   
 }
 
