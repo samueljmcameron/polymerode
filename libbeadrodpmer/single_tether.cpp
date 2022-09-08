@@ -106,7 +106,7 @@ int SingleTether::single_step(double t,double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       atoms[i].R = Rtmp[i];
 
-
+    compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
   }
   else {
@@ -170,7 +170,7 @@ int SingleTether::single_step(double t,double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       atoms[i].R = Rtmp[i];
 
-
+    compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,X0_t,dX0dt,itermax,numtries,throw_exception);
   }
   else {
