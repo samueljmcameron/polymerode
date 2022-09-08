@@ -76,19 +76,19 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
       input::isInt(splitvec[iarg+1],number_of_nuc_strengths,splitvec[iarg]);
       nuc_strengths.resize(number_of_nuc_strengths);
       for (int i = 1; i <= number_of_nuc_strengths; i++) 
-	input::isInt(splitvec[iarg+1+i],nuc_strengths[i-1],splitvec[iarg]);
+	input::isDouble(splitvec[iarg+1+i],nuc_strengths[i-1],splitvec[iarg]);
       iarg += number_of_nuc_strengths+2;
     } else if (splitvec[iarg] == "nuc_maxs") {
       input::isInt(splitvec[iarg+1],number_of_nuc_maxs,splitvec[iarg]);
       nuc_maxs.resize(number_of_nuc_maxs);
       for (int i = 1; i <= number_of_nuc_maxs; i++) 
-	input::isInt(splitvec[iarg+1+i],nuc_maxs[i-1],splitvec[iarg]);
+	input::isDouble(splitvec[iarg+1+i],nuc_maxs[i-1],splitvec[iarg]);
       iarg += number_of_nuc_maxs+2;
     } else if (splitvec[iarg] == "nuc_widths") {
       input::isInt(splitvec[iarg+1],number_of_nuc_widths,splitvec[iarg]);
       nuc_widths.resize(number_of_nuc_widths);
       for (int i = 1; i <= number_of_nuc_widths; i++) 
-	input::isInt(splitvec[iarg+1+i],nuc_widths[i-1],splitvec[iarg]);
+	input::isDouble(splitvec[iarg+1+i],nuc_widths[i-1],splitvec[iarg]);
       iarg += number_of_nuc_widths+2;
     } else {
       throw std::runtime_error("Error: invalid argument for build_polymer.");
