@@ -1,5 +1,6 @@
 #include "no_tether.hpp"
 #include "input.hpp"
+#include "initialise.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -12,8 +13,7 @@ namespace BeadRodPmer {
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-NoTether::NoTether(const std::vector<std::string> & splitvec,
-		   bool line_initial_condition)
+NoTether::NoTether(const std::vector<std::string> & splitvec)
   : Polymer(splitvec)
 {
 
@@ -45,18 +45,9 @@ NoTether::NoTether(const std::vector<std::string> & splitvec,
 
   end_inverses.setZero();
 
-  if (line_initial_condition)
-    init_atoms_caret();
-  else
-    init_atoms_rand();
+  // set ^ configuration, with the bottoms of the ^ being x0 and xN
+  init_atoms_caret();
 
-}
-
-/* -------------------------------------------------------------------------- */
-/* Destructor */
-/* -------------------------------------------------------------------------- */
-NoTether::~NoTether()
-{
 }
 
 
@@ -923,14 +914,13 @@ void NoTether::init_atoms_caret()
   
   Eigen::Vector3d dd = xN-x0;
 
+  if (dd.norm() > bondlength*(Nbeads-1)) {
+    throw std::runtime_error("|x0-xN| is longer than the polymer.");
+  }
+
+
   if (dd.norm() < SMALL) {
-    std::cerr << "Warning, end points of polymer are too close together to "
-	      << "make a caret configuration. Switching to a random configuration."
-	      << std::endl;
-    init_atoms_rand();
-    
-    return;
-    
+    throw std::runtime_error("|x0-xN| is longer than the polymer.");
   }
 
   if (std::abs(dd(2)) < SMALL) {

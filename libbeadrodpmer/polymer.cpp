@@ -13,7 +13,7 @@ namespace BeadRodPmer {
 /* -------------------------------------------------------------------------- */
 Polymer::Polymer(const std::vector<std::string> & splitvec)
   : gen(0), dist(-0.5,0.5), flag_x0(false),flag_xN(false),
-    flag_initdoubleteth(false)
+    flag_initdoubleteth(false),equilibration_steps(0)
 {
 
 
@@ -60,12 +60,16 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
     } else if (splitvec[iarg] == "seed") {
       input::isInt(splitvec[iarg+1],seed,splitvec[iarg]);
       iarg += 2;
+    } else if (splitvec[iarg] == "equilibration_steps") {
+      input::isInt(splitvec[iarg+1],equilibration_steps,splitvec[iarg]);
+      iarg += 2;
     } else if (splitvec[iarg] == "init_ends") {
       input::isDouble(splitvec[iarg+1],initspringK,splitvec[iarg]);
       input::isDouble(splitvec[iarg+2],initdt,splitvec[iarg]);
       input::isDouble(splitvec[iarg+3],inittolerance,splitvec[iarg]);
+      input::isInt(splitvec[iarg+4],equilibration_steps,splitvec[iarg]);
       flag_initdoubleteth = true;
-      iarg += 4;
+      iarg += 5;
     } else if (splitvec[iarg] == "nuc_beads") {
       input::isInt(splitvec[iarg+1],number_of_nuc_beads,splitvec[iarg]);
       nuc_beads.resize(number_of_nuc_beads);
@@ -132,16 +136,6 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
 
   
 }
-
-/* -------------------------------------------------------------------------- */
-/* Destructor */
-/* -------------------------------------------------------------------------- */
-Polymer::~Polymer()
-{
-}
-
-
-
 
 
 

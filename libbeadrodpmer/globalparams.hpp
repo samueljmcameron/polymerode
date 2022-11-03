@@ -10,21 +10,11 @@
 
 namespace BeadRodPmer {
 class GlobalParams {
-private:
-
-  std::set<std::string> pset {"molecules", "steps",
-      "timestep", "dump_every", "dump_file"};
-  
-  int default_molecules;
-  int default_steps;
-  double default_timestep;
-  int default_dump_every;
-  std::string default_dump_file;
-  
 public:
   GlobalParams(std::ifstream&,
 	       std::map<std::string,std::string> const &,
-	       std::string&);
+	       std::string&,
+	       std::vector<std::string> EO_globals = {"no_tether","single_tether","double_tether"});
 
   int molecules;
   int steps;

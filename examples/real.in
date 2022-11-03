@@ -2,12 +2,11 @@
 
 molecules    1
 steps        10000
-timestep     0.001
+timestep     1e-3
 dump_every   100
 
-dump_file    data/mol${label}.trj
+dump_file    data/mol.trj
 
 # set polymer parameters
 
-
-double_tether beads 200 bondlength 1.0 zeta_para 6.2 zeta_perp 12.5 temp 4.114 bending 206.0 x0 0 0 0 xN 5.0 5.0 5.0 seed ${seed} init_ends 10 0.001 1.0
+double_tether beads 100 bondlength 2.0 zeta_para 0.5 zeta_perp 1.0 temp 4.114 bending 206.0 x0 -15.0 -20.0 0.0 xN 15.0 20.0 0.0 seed 712049 init_ends 100 1e-3 0.1 10000

@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include <random>
+#include <functional>
 
 namespace BeadRodPmer {
 typedef Eigen::SparseMatrix<double> SpMat; // declares column-major
@@ -24,7 +25,6 @@ class Polymer {
 public:
   // constructor
   Polymer(const std::vector<std::string> &);
-  ~Polymer();  
 
 
   void compute_tangents_and_friction();
@@ -77,8 +77,40 @@ public:
 
   Eigen::SparseLU< SpMat > jacob_solver;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
+
+
+  int equilibration_steps;
+  double initspringK;   // spring constant for initializing double tether
+  double initdt;        // time step for initializing double tether
+  double inittolerance; // how far from specified tether is acceptable when
+
+
+
+
+  virtual int single_step(double, double,
+			  const std::vector<std::vector<double>> &,
+			  int, int , bool ) = 0;
+
+
+    
+  virtual void set_G() = 0;
+  virtual void update_G() = 0;
+
+
   
+  virtual void set_Hhat() = 0;
+  virtual void update_Hhat() = 0;
+
+  virtual void set_dCdlambda() = 0;
+  virtual void update_dCdlambda(double) = 0;
+
+  virtual void compute_noise() = 0;
   
+  virtual void initial_integrate(double) = 0;
+  virtual void final_integrate(double) = 0;
+
+  virtual void compute_effective_kappa() = 0;
+
 protected:
   int Nbeads;           // number of polymer beads
   double bondlength;    // length of rods connecting beads
@@ -87,12 +119,9 @@ protected:
   double temp;
   double kappa;         // bare bending energy
 
-  double initspringK;   // spring constant for initializing double tether
-  double initdt;        // time step for initializing double tether
-  double inittolerance; // how far from specified tether is acceptable when
                                   //  initializing double tether
   
-  Eigen::Vector3d x0,xN;         // location of tethered bead
+  Eigen::Vector3d x0,xN;         // desired location of tethered beads
 
   bool flag_x0, flag_xN, flag_initdoubleteth;
 
@@ -123,6 +152,18 @@ protected:
 
   Eigen::VectorXd k_effs;
   Eigen::VectorXd end_inverses;
+
+private:
+
+  virtual std::vector<T> init_G_coeffsmatrix() = 0;
+
+  
+
+  virtual std::vector<T> init_Hhat_coeffsmatrix() = 0;  
+
+  virtual std::vector<T> init_dCdlambda_coeffsmatrix() = 0;
+
+  virtual void set_rhs_of_G() = 0;
 
 
 };

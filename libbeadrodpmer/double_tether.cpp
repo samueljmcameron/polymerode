@@ -38,17 +38,7 @@ DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
   tDets.resize(Nbeads+3);
   bDets.resize(Nbeads+3);
 
-  std::cout << "initiating double tether." << std::endl;
-  
-  Initialise::init_atoms(splitvec,atoms,x0,xN,initspringK,initdt,inittolerance);
-  
-}
-
-/* -------------------------------------------------------------------------- */
-/* Destructor */
-/* -------------------------------------------------------------------------- */
-DoubleTether::~DoubleTether()
-{
+    
 }
 
 

@@ -5,15 +5,11 @@
 using namespace BeadRodPmer;
 GlobalParams::GlobalParams(std::ifstream& input,
 			   std::map<std::string,std::string> const& varMap,
-			   std::string& lastline) :
-  default_molecules(1),default_steps(1000000),default_timestep(0.001),
-  default_dump_every(1000000),default_dump_file("dump.trj")
+			   std::string& lastline,
+			   std::vector<std::string> EO_globals) :
+  molecules(1),steps(1000000),timestep(0.001),
+  dump_every(1000000),dump_file("dump.trj")
 {
-
-  molecules = default_molecules;
-  steps = default_steps;
-  timestep = default_timestep;
-  dump_every = default_dump_every;
 
   std::string line;  
   if (input) {
@@ -35,10 +31,18 @@ GlobalParams::GlobalParams(std::ifstream& input,
 
       // check if keyword is global parameter, assume if not then
       // no longer defining global params
-      if (pset.find(splitvec[0]) == pset.end()) {
-	lastline = line;
-	return;
-      }
+
+      int break_global = 0;
+
+      // if build_solution, then global variable definitions are done
+      for (auto &eo_glob : EO_globals)
+	if (splitvec[0] == eo_glob) {
+	  break_global = 1;
+	  break;
+	}
+
+      if (break_global) break;
+
       
       if (splitvec.size() != expectedsize) {
 	throw std::runtime_error("Error: invalid input file.");

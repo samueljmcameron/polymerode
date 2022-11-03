@@ -2,32 +2,28 @@
 #include <Eigen/Core>
 #include <iostream>
 
+#include "initialise.hpp"
+
 namespace BeadRodPmer {
 namespace Initialise {
 /* -------------------------------------------------------------------------- */
 /* This function creates a polymer with endpoints at specific locations in a
    way that is not unreasonably asymmetric (as it would be if one end were
-   tethered). THIS FUNCTION CANNOT BE CALLED IN THE CONSTRUCTOR OF NoTether,
-   else it would cause a never ending loop (I think)! */
+   tethered). */
 /* -------------------------------------------------------------------------- */
 
 void init_atoms(const std::vector<std::string> & splitvec,
 		std::vector<Atom> &atoms_to_set,
-		Eigen::Vector3d &x0, Eigen::Vector3d &xN,
 		double springK,double dt, double tolerance,
-		int bufsteps)
+		int equilibration_steps)
 {
 
   
-  BeadRodPmer::NoTether pmer(splitvec,true);
+  BeadRodPmer::NoTether pmer(splitvec);
 
-  if ((x0 - pmer.get_x0()).norm() > 1e-8 ||
-      (xN - pmer.get_xN()).norm() > 1e-8) 
-    throw std::runtime_error("SOMething is very wrong!!!!!");
-  
+  Eigen::Vector3d x0 = pmer.get_x0();
+  Eigen::Vector3d xN = pmer.get_xN();
 
-  if ((x0-xN).norm() > pmer.get_bondlength()*(pmer.get_Nbeads()-1))
-    throw std::runtime_error("|x0-xN| is longer than the polymer.");
   
   // delete all nucleation sites
   pmer.nuc_beads.clear();
@@ -36,7 +32,6 @@ void init_atoms(const std::vector<std::string> & splitvec,
   // the desired location
 
   int b_index = pmer.get_Nbeads()-1;
-
 
 
   pmer.nuc_beads.push_back(0);
@@ -77,9 +72,9 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
 
 
-  
+
   while ((pmer.atoms[b_index].R-xN).norm() > tolerance
-	 || (pmer.atoms[0].R-x0).norm() > tolerance || t < bufsteps*dt) {
+	 || (pmer.atoms[0].R-x0).norm() > tolerance || t < equilibration_steps*dt) {
 
 
     dFdX_is[0][0] = springK*(pmer.atoms[0].R(0)-x0(0));
@@ -92,24 +87,13 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
     pmer.single_step(t,dt,dFdX_is);
     t += dt;
-    
-    
-    //    std::cout << "distance to tethered point: " << measure << std::endl;
-    
+
   }
 
   for (int index = 0; index < pmer.get_Nbeads(); index ++ ) 
     atoms_to_set.at(index).R = pmer.atoms[index].R;
-
-  std::cout << "Reached time t = " << t << " for setting up double tether. " << std::endl;
-
-  // MUST RESET x0 and xN after doing this, or else code will break as
-  // any tolerance errors in init_atoms will mean that R_1 != x0 and R_N != XN
-  x0 = atoms_to_set.at(0).R;
-  xN = atoms_to_set.at(pmer.get_Nbeads()-1).R;
-
   
-  return;
+  return ;
   
   
   

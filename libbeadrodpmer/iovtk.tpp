@@ -195,6 +195,9 @@ void ioVTK::readVTKPolyData(pMer &pmer,std::string fname)
 
   
   auto myfile = std::fstream(fname, std::ios::in);
+  if (not myfile.is_open()) {
+    throw std::runtime_error(std::string("Cannot open file ") + fname);
+  }
 
   
 

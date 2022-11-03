@@ -47,15 +47,8 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
 
   end_inverses.setZero();
 
-  Initialise::init_atoms(splitvec,atoms,x0,xN,initspringK,initdt,inittolerance);  
 }
 
-/* -------------------------------------------------------------------------- */
-/* Destructor */
-/* -------------------------------------------------------------------------- */
-SingleTether::~SingleTether()
-{
-}
 
 int SingleTether::single_step(double t,double dt,
 			      const std::vector<std::vector<double>> & dFdX_i,

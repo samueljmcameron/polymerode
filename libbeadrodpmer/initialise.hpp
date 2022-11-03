@@ -1,3 +1,6 @@
+#ifndef BEADRODPMER_INITIALISE_HPP
+#define BEADRODPMER_INITIALISE_HPP
+
 #include "atom.hpp"
 
 #include <vector>
@@ -9,7 +12,9 @@ namespace Initialise {
 
 void init_atoms(const std::vector<std::string> & splitvec,
 		std::vector<Atom> &atoms_to_set,
-		Eigen::Vector3d &x0, Eigen::Vector3d &xN,
-		double springK,double dt, double tolerance,int bufsteps=10000);
+		double springK,double dt, double tolerance,
+		int equilibration_steps);
 }
 }
+
+#endif
