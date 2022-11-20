@@ -25,7 +25,7 @@ class Polymer {
 public:
   // constructor
   Polymer(const std::vector<std::string> &);
-
+  enum PTYPE {NONE,SINGLE,DOUBLE};
 
   void compute_tangents_and_friction();
   void set_unprojected_noise(double);
@@ -94,22 +94,11 @@ public:
 
     
   virtual void set_G() = 0;
-  virtual void update_G() = 0;
 
-
-  
   virtual void set_Hhat() = 0;
-  virtual void update_Hhat() = 0;
 
   virtual void set_dCdlambda() = 0;
-  virtual void update_dCdlambda(double) = 0;
 
-  virtual void compute_noise() = 0;
-  
-  virtual void initial_integrate(double) = 0;
-  virtual void final_integrate(double) = 0;
-
-  virtual void compute_effective_kappa() = 0;
 
 protected:
   int Nbeads;           // number of polymer beads
@@ -130,14 +119,16 @@ protected:
   std::uniform_real_distribution<double> dist;
   
   std::vector<Bond> tmpbonds;
-  
-  double Hhat_diag_val(int);
-  double dCdlambda_diag_val(int);
-  
-  double Hhat_loweroff_val(int);
-  double dCdlambda_loweroff_val(int);
-  double dCdlambda_upperoff_val(int);
 
+
+
+
+  virtual void compute_noise() = 0;
+  
+
+
+  virtual void compute_effective_kappa() = 0;
+  
   double Hhat_endblocks(int,int,int);
   double Hhat_leftside(int);
   double dCdlambda_leftside(int);
@@ -153,18 +144,38 @@ protected:
   Eigen::VectorXd k_effs;
   Eigen::VectorXd end_inverses;
 
-private:
+  void set_rhs_of_G(int);
 
-  virtual std::vector<T> init_G_coeffsmatrix() = 0;
+  void set_rhs_of_Hhat(int);
+  void init_G_coeffsmatrix(int ,std::vector<T> &);
+  void update_G(int);
+  void update_Hhat(int);
+  void update_dCdlambda(double,int) ;
+  void init_Hhat_coeffsmatrix(int, std::vector<T>  &);
 
   
+  void set_bdets_and_tdets(int);
 
-  virtual std::vector<T> init_Hhat_coeffsmatrix() = 0;  
+  
+  void init_dCdlambda_coeffsmatrix(int,std::vector<T> &);
 
-  virtual std::vector<T> init_dCdlambda_coeffsmatrix() = 0;
+  void update_noise(int);
 
-  virtual void set_rhs_of_G() = 0;
+  
+  
+  void initial_integrate(double,int,PTYPE);
+  void final_integrate(double,int,PTYPE);
 
+  void calculate_constraint_errors(int offset);
+
+private:
+
+  double Hhat_diag_val(int);
+  double Hhat_loweroff_val(int);
+  
+  double dCdlambda_diag_val(int);
+  double dCdlambda_loweroff_val(int);
+  double dCdlambda_upperoff_val(int);
 
 };
 };

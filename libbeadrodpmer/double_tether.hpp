@@ -26,16 +26,15 @@ public:
 		  bool throw_exception = true);
   
   void set_G() override;
-  void update_G() override;
+
 
   void set_Hhat() override;
-  void update_Hhat() override;
 
 
 
 
   void set_dCdlambda() override;
-  void update_dCdlambda(double) override;
+
   void test_jacob(int,double,const Eigen::Vector3d &, const Eigen::Vector3d &) ;  
 
 
@@ -43,17 +42,11 @@ public:
 		      int itermax = 20, double tol = 1e-14) ;
 
 
-
-
-
   void compute_noise() override;
   void compute_tension(const Eigen::Vector3d &,
 		       const Eigen::Vector3d &) ;
 
   
-  void initial_integrate(double) override;
-  void final_integrate(double) override;
-
   void calculate_constraint_errors(const Eigen::Vector3d &,
 				   const Eigen::Vector3d &) ;  
 
@@ -62,15 +55,18 @@ public:
 private:
   
 
-  std::vector<T> init_G_coeffsmatrix() override;
+  std::vector<T> init_G_coeffsmatrix();
+
+  void update_G();  
+  void update_Hhat();
+  void update_dCdlambda(double);
 
   
+  std::vector<T> init_Hhat_coeffsmatrix();  
 
-  std::vector<T> init_Hhat_coeffsmatrix() override;  
+  std::vector<T> init_dCdlambda_coeffsmatrix();
 
-  std::vector<T> init_dCdlambda_coeffsmatrix() override;
-
-  void set_rhs_of_G() override;
+  void set_rhs_of_G();
   void set_rhs_of_Hhat(const Eigen::Vector3d &,
 		       const Eigen::Vector3d &) ;
   

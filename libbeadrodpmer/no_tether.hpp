@@ -17,18 +17,11 @@ public:
 
     
   void set_G() override ;
-  void update_G() override ;
-
-
   
   void set_Hhat() override;
-  void update_Hhat() override;
-
-
-
 
   void set_dCdlambda() override;
-  void update_dCdlambda(double) override;
+  
   void test_jacob(int,double) ;
 
 
@@ -41,27 +34,10 @@ public:
   void compute_noise() override;
   void compute_tension() ;
 
-  
-  void initial_integrate(double) override;
-  void final_integrate(double) override;
-
-  void calculate_constraint_errors();  
-
   void compute_effective_kappa() override;
 
 private:
   
-
-  std::vector<T> init_G_coeffsmatrix() override;
-
-  
-
-  std::vector<T> init_Hhat_coeffsmatrix() override;  
-
-  std::vector<T> init_dCdlambda_coeffsmatrix() override;
-
-  void set_rhs_of_G() override;
-  void set_rhs_of_Hhat();
 
   void init_atoms_rand();
   void init_atoms_line();

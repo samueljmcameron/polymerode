@@ -43,7 +43,7 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
   tDets.resize(Nbeads);
   bDets.resize(Nbeads);
 
-  end_inverses.setZero();
+  
 
   // set ^ configuration, with the bottoms of the ^ being x0 and xN
   init_atoms_caret();
@@ -69,8 +69,8 @@ int NoTether::single_step(double t, double dt,
 
   
   set_unprojected_noise(dt);
-  update_G();
-  update_Hhat();
+  update_G(0);
+  update_Hhat(0);
   compute_noise();
   compute_effective_kappa();
   compute_uc_forces();
@@ -79,11 +79,11 @@ int NoTether::single_step(double t, double dt,
     add_external_force(dFdX_i[index],nuc_beads[index]);
   
   compute_tension();
-  initial_integrate(dt);
+  initial_integrate(dt,0,NONE);
   
 
   
-  update_Hhat();
+  update_Hhat(0);
   compute_effective_kappa();
   compute_uc_forces();
   
@@ -107,7 +107,7 @@ int NoTether::single_step(double t, double dt,
     compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
   } else {
-    final_integrate(dt);
+    final_integrate(dt,0,NONE);
   
     compute_tangents_and_friction();
   }
@@ -118,24 +118,7 @@ int NoTether::single_step(double t, double dt,
 
 
 
-/* ---------------------------------------------------------------------------- */
-/* RHS of G*eta = P. */
-/* ---------------------------------------------------------------------------- */
-void NoTether::set_rhs_of_G()
-{
 
-
-  
-  for (int i = 0; i < Nbeads-1; i++) {
-    rhs_of_G(i) = bonds[i].rod.dot(atoms[i+1].unprojected_noise
-				   -atoms[i].unprojected_noise);
-
-  }
-
-  
-  return;
-  
-}
 
 
 /* -------------------------------------------------------------------------- */
@@ -144,7 +127,8 @@ void NoTether::set_rhs_of_G()
 void NoTether::set_G()
 {
 
-  std::vector<T> coefficients = init_G_coeffsmatrix();
+  std::vector<T> coefficients;
+  init_G_coeffsmatrix(0,coefficients);
 
   Gmunu.setFromTriplets(coefficients.begin(),coefficients.end());
 
@@ -155,57 +139,7 @@ void NoTether::set_G()
 }
 
 
-/* -------------------------------------------------------------------------- */
-/* Helper function to initialise matrix G. */
-/* -------------------------------------------------------------------------- */
-std::vector<T> NoTether::init_G_coeffsmatrix()
-{
-  // just set lower diagonal
 
-  std::vector<T> coeffs;
-
-  coeffs.push_back(T(0,0,2));
-  
-  for (int i = 1; i < Nbeads-1; i++) {
-    coeffs.push_back(T(i,i,2));
-    coeffs.push_back(T(i,i-1,-costhetas(i-1)));
-
-  }
-  
-  return coeffs;
-
-  
-}
-
-/* -------------------------------------------------------------------------- */
-/* Update matrix G. Call at every time step aside from initial step. */
-/* -------------------------------------------------------------------------- */
-void NoTether::update_G()
-{
-  // update first column by hand
-
-
-
-  Gmunu.coeffRef(1,0) = -costhetas(0);
-
-
-  // update middle columns
-  for (int k = 1; k < Nbeads-2; k++) {
-
-
-    int count = 0;
-    for (SpMat::InnerIterator it(Gmunu,k); it; ++it) {
-      if (count == 1) {
-	it.valueRef() = -costhetas(k);
-
-      }
-      count += 1;
-    }
-  }
-
-  
-  return;
-}
 
 void NoTether::compute_effective_kappa()
 {
@@ -217,21 +151,7 @@ void NoTether::compute_effective_kappa()
   bDets(Nbeads-2) = 2;
   tDets(1) = 2;
 
-  int mu;
-  for (int i = 0; i < Nbeads - 2; i++ ) {
-
-    mu = Nbeads-2-i;
-    bDets(mu-1) = 2*bDets(mu)
-      - costhetas(mu-1)*costhetas(mu-1)*bDets(mu+1);
-
-    mu = i+2;
-
-    tDets(mu) = 2*tDets(mu-1)-costhetas(mu-2)*costhetas(mu-2)*tDets(mu-2);
-
-
-  }
-
-
+  set_bdets_and_tdets(0);
 
   double gDet = tDets(Nbeads-1);
   
@@ -251,32 +171,6 @@ void NoTether::compute_effective_kappa()
 
 
 
-/* ---------------------------------------------------------------------------- */
-/* RHS of Hhat*lambda = Q. */
-/* ---------------------------------------------------------------------------- */
-void NoTether::set_rhs_of_Hhat()
-{
-
-  
-  
-  for (int i = 0; i< Nbeads-1; i++) {
-
-
-    rhs_of_Hhat(i) = bonds[i].rod.dot(atoms[i+1].friction*(atoms[i+1].Fpot
-							   +atoms[i+1].noise)
-				      -atoms[i].friction*(atoms[i].Fpot
-							  +atoms[i].noise));
-    
-  }
-
-  return;
-  
-}
-
-
-
-
-
 
 /* -------------------------------------------------------------------------- */
 /* Initialise matrix H hat. */
@@ -284,7 +178,8 @@ void NoTether::set_rhs_of_Hhat()
 void NoTether::set_Hhat()
 {
 
-  std::vector<T> coefficients = init_Hhat_coeffsmatrix();
+  std::vector<T> coefficients;
+  init_Hhat_coeffsmatrix(0,coefficients);
 
   Hhat.setFromTriplets(coefficients.begin(),coefficients.end());
 
@@ -296,71 +191,6 @@ void NoTether::set_Hhat()
 }
 
 
-/* -------------------------------------------------------------------------- */
-/* Helper function to initialise matrix H hat. */
-/* -------------------------------------------------------------------------- */
-std::vector<T> NoTether::init_Hhat_coeffsmatrix()
-{
-
-  // only use lower triangular part as it's a symmetric matrix.  
-  std::vector<T> coeffs;
-
-
-
-  
-  coeffs.push_back(T(0,0,Hhat_diag_val(0)));
-  
-  
-  for (int i = 1; i < Nbeads-1; i++) {
-    coeffs.push_back(T(i,i,Hhat_diag_val(i)));
-    coeffs.push_back(T(i,i-1,Hhat_loweroff_val(i)));
-
-  }
-
-
-  return coeffs;
-
-  
-}
-
-
-
-
-
-
-/* -------------------------------------------------------------------------- */
-/* Update matrix M. Call at every time step aside from initial step. */
-/* -------------------------------------------------------------------------- */
-void NoTether::update_Hhat()
-{
-
-
-  // update first column by hand
-
-    
-  Hhat.coeffRef(0,0) = Hhat_diag_val(0);
-
-  Hhat.coeffRef(1,0) = Hhat_loweroff_val(1);
-
-  // update middle columns
-  for (int k = 1; k < Nbeads-2; k++) {
-
-    int count = 0;
-    for (SpMat::InnerIterator it(Hhat,k); it; ++it) {
-      if (count == 0) {
-	it.valueRef() = Hhat_diag_val(k);
-
-      } else {
-	it.valueRef() = Hhat_loweroff_val(k+1);
-      }
-
-      count += 1;
-    }
-  }
-  Hhat.coeffRef(Nbeads-2,Nbeads-2) = Hhat_diag_val(Nbeads-2);
-  return;
-}
-
 
 
 
@@ -370,7 +200,9 @@ void NoTether::update_Hhat()
 void NoTether::set_dCdlambda()
 {
 
-  std::vector<T> coefficients = init_dCdlambda_coeffsmatrix();
+  std::vector<T> coefficients;
+  
+  init_dCdlambda_coeffsmatrix(0,coefficients);
 
   dCdlambda.setFromTriplets(coefficients.begin(),coefficients.end());
 
@@ -381,112 +213,16 @@ void NoTether::set_dCdlambda()
 }
 
 
-
-/* -------------------------------------------------------------------------- */
-/* Helper function to initialise matrix dCdlambda. */
-/* -------------------------------------------------------------------------- */
-std::vector<T> NoTether::init_dCdlambda_coeffsmatrix()
-{
-
-  // initializing the vector as the full (both upper and lower) part of Hhat, since
-  // this matrix won't be symmetric.
-  std::vector<T> coeffs;
-
-  coeffs.push_back(T(0,0,Hhat_diag_val(0)));
-  
-  
-  for (int i = 1; i < Nbeads-1; i++) {
-    coeffs.push_back(T(i-1,i,Hhat_loweroff_val(i)));
-    coeffs.push_back(T(i,i,Hhat_diag_val(i)));
-    coeffs.push_back(T(i,i-1,Hhat_loweroff_val(i)));
-
-
-  }
-
-  
-
-  return coeffs;
-
-
-}
-
-
-
-
-
-
-void NoTether::update_dCdlambda(double Delta_t)
-{
-
-
-
-  dCdlambda.coeffRef(0,0) = -dCdlambda_diag_val(0)*Delta_t;
-  dCdlambda.coeffRef(1,0)  = -dCdlambda_loweroff_val(1)*Delta_t;
-  
-
-  // update middle columns
-  for (int k = 1; k < Nbeads-2; k++) {
-
-
-    int count = 0;
-    for (SpMat::InnerIterator it(dCdlambda,k); it; ++it) {
-
-      if (count == 0) {
-    	it.valueRef() = -dCdlambda_upperoff_val(k)*Delta_t;
-	
-      } else if (count == 1) {
-	
-	it.valueRef() = -dCdlambda_diag_val(k)*Delta_t;
-	
-      } else {
-
-	it.valueRef() = -dCdlambda_loweroff_val(k+1)*Delta_t;
-      }
-
-      count += 1;
-    }
-  }
-
-
-  // Nbeads - 1 col
-  dCdlambda.coeffRef(Nbeads-3, Nbeads-2) = - dCdlambda_upperoff_val(Nbeads-2)*Delta_t;
-  							 
-  dCdlambda.coeffRef(Nbeads-2, Nbeads-2) = - dCdlambda_diag_val(Nbeads-2)*Delta_t;
-
-
-  return;
-
-}
-
-
-
 void NoTether::compute_noise()
 {
 
 
-  set_rhs_of_G();
+  set_rhs_of_G(0);
   Gmunu_solver.factorize(Gmunu);
 
   dummy_for_noise =  Gmunu_solver.solve(rhs_of_G);
 
-  int i = 0;
-  atoms[i].noise = (atoms[i].unprojected_noise
-		    + dummy_for_noise(i)*bonds[i].rod);
-
-  
-  
-  for (i = 1; i < Nbeads-1; i++) {
-    atoms[i].noise = (atoms[i].unprojected_noise
-		      + dummy_for_noise(i)*bonds[i].rod
-		      - dummy_for_noise(i-1)*bonds[i-1].rod);
-  }
-
-
-  i = Nbeads-1;
-
-  atoms[i].noise = (atoms[i].unprojected_noise
-		    - dummy_for_noise(i-1)*bonds[i-1].rod);
-
+  update_noise(0);
   
 }
 
@@ -496,7 +232,7 @@ void NoTether::compute_tension()
 
 
 
-  set_rhs_of_Hhat();
+  set_rhs_of_Hhat(0);
 
   Hhat_solver.factorize(Hhat);
   tension =  Hhat_solver.solve(rhs_of_Hhat);
@@ -510,10 +246,10 @@ void NoTether::test_jacob(int mu,double Delta_t)
   // start by initializing the vector dC at whatever tensions
   
   
-  calculate_constraint_errors();
+  calculate_constraint_errors(0);
 
 
-  update_dCdlambda(Delta_t);
+  update_dCdlambda(Delta_t,0);
 
   
   //  std::cout << "exact calc: " << std::endl;
@@ -528,9 +264,9 @@ void NoTether::test_jacob(int mu,double Delta_t)
     tension(mu) -= tens_change_old;
     tension(mu) += tens_change;
     
-    final_integrate(Delta_t);
+    final_integrate(Delta_t,0,NONE);
 
-    calculate_constraint_errors();
+    calculate_constraint_errors(0);
     
     std::cout << "numerical estimate with dlamda =  " << tens_change
 	      << "and lambda = " << tension(mu) << " is = " << std::endl;
@@ -548,9 +284,9 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
 {
 
   // set C_mu and dC_mu/dlambda_nu
-  final_integrate(Delta_t);
-  calculate_constraint_errors();
-  update_dCdlambda(Delta_t);
+  final_integrate(Delta_t,0,NONE);
+  calculate_constraint_errors(0);
+  update_dCdlambda(Delta_t,0);
 
   
   //and then solve
@@ -564,8 +300,6 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
     return itermax + 1;
   }
 
-
-  
   negative_tension_change = jacob_solver.solve(constraint_errors);
   
   tension = tension - negative_tension_change;
@@ -576,9 +310,9 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
 
 
 
-    final_integrate(Delta_t);
-    calculate_constraint_errors();
-    update_dCdlambda(Delta_t);
+    final_integrate(Delta_t,0,NONE);
+    calculate_constraint_errors(0);
+    update_dCdlambda(Delta_t,0);
 
   
     jacob_solver.factorize(dCdlambda);
@@ -593,7 +327,7 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
     
     negative_tension_change = jacob_solver.solve(constraint_errors);
 
-
+    
     tension = tension - negative_tension_change;
     count += 1;
   }
@@ -601,163 +335,12 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
   
 }
 
-
-
-/*----------------------------------------------------------------------------*/
-/* Computes the bead positions at the midstep, along with updating the
-   un-normalised bond tangents, the (normalised) bead tangents, friction
-   tensors, and cos(theta_i)s. */
-/*----------------------------------------------------------------------------*/
-void NoTether::initial_integrate(double Delta_t)
-{
-  
-  double tmp = Delta_t/2.0;
-
-  double tangentnorm;
-
-  
-  int i = 0;
-  Rtmp[0] = atoms[0].R;
-
-  atoms[0].t_force = tension(0)*bonds[0].rod;
-
-
-  atoms[0].R += tmp*atoms[0].friction*(atoms[0].Fpot+atoms[0].noise+atoms[0].t_force);
-
-  i = 1;
-  Rtmp[i] = atoms[i].R;
-
-
-  atoms[i].t_force = tension(i)*bonds[i].rod-tension(i-1)*bonds[i-1].rod;
   
   
-  atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-
-  bonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-  tmpbonds[i-1].rod = bonds[i-1].rod;
-  
-  tangentnorm = sqrt(bonds[i-1].rod.dot(bonds[i-1].rod));
-  atoms[i-1].tangent = bonds[i-1].rod/tangentnorm;
-
-
-  // compute friction with new values of R on bead i-1
-  single_inv_friction(i-1);
-  
-  for (i = 2; i < Nbeads-1; i++) {
-
-    Rtmp[i] = atoms[i].R;
-
-    atoms[i].t_force = tension(i)*bonds[i].rod-tension(i-1)*bonds[i-1].rod;
-
-
-    atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-
-    bonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-    tmpbonds[i-1].rod = bonds[i-1].rod;
-
-    costhetas(i-2) = bonds[i-1].rod.dot(bonds[i-2].rod)
-      /(bonds[i-1].rod.norm()*bonds[i-2].rod.norm());
-
-
-    tangentnorm = sqrt((bonds[i-1].rod+bonds[i-2].rod
-			).dot(bonds[i-1].rod+bonds[i-2].rod));
-
-
-    atoms[i-1].tangent = (bonds[i-1].rod+bonds[i-2].rod)/tangentnorm;
-
-    single_inv_friction(i-1);
-
-  }
-
-
-  i = Nbeads -1;
-
-  Rtmp[i] = atoms[i].R;
-
-  atoms[i].t_force = -tension(i-1)*bonds[i-1].rod;
-
-
-
-  atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-
-  bonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-  tmpbonds[i-1].rod = bonds[i-1].rod;
-
-
-  costhetas(i-2) = bonds[i-1].rod.dot(bonds[i-2].rod)
-    /(bonds[i-1].rod.norm()*bonds[i-2].rod.norm());
-
-  
-  tangentnorm = sqrt((bonds[i-1].rod+bonds[i-2].rod
-		      ).dot(bonds[i-1].rod+bonds[i-2].rod));
   
   
-  atoms[i-1].tangent = (bonds[i-1].rod+bonds[i-2].rod)/tangentnorm;
   
-  single_inv_friction(i-1);
-  
-  tangentnorm = sqrt(bonds[i-1].rod.dot(bonds[i-1].rod));
-  atoms[i].tangent = bonds[i-1].rod/tangentnorm;
-
-  single_inv_friction(i);
-
-  return;
-}
-
-/*----------------------------------------------------------------------------*/
-/* Computes the final bead positions and unnormalised bond tangents. */
-/*----------------------------------------------------------------------------*/
-void NoTether::final_integrate(double Delta_t)
-{
-  
-  double tmp = Delta_t;
-
-
-
-
-  atoms[0].t_force= tension(0)*bonds[0].rod;
-
-  
-
-  atoms[0].R = Rtmp[0] + tmp*atoms[0].friction*(atoms[0].Fpot+atoms[0].noise+atoms[0].t_force);
-
-
-    
-  for (int i = 1; i < Nbeads-1; i++) {
-
-    atoms[i].t_force = tension(i)*bonds[i].rod-tension(i-1)*bonds[i-1].rod;
-
-    atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-    tmpbonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-    
-  }
-
-  int i = Nbeads -1;
-
-  atoms[i].t_force = -tension(i-1)*bonds[i-1].rod;
-
-
-  atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-  tmpbonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-  return;
-}
-
-
-
-
-void NoTether::calculate_constraint_errors()
-{
-  for (int mu = 1; mu < Nbeads; mu++) {
-    constraint_errors(mu-1) = (atoms[mu].R-atoms[mu-1].R).norm()-bondlength;
-  }
-
-  return;
-
-}
-
-
-
-namespace gramschmidt {
+  namespace gramschmidt {
 void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
 		 Eigen::Vector3d& ez)
 {
