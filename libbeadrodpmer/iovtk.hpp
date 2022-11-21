@@ -4,13 +4,15 @@
 #include <string>
 #include <vector>
 
+#include "polymer.hpp"
+
 namespace BeadRodPmer {
 namespace ioVTK {
 
-  template <typename pMer>
-  void writeVTKPolyData(std::string,const pMer &);
-  template <typename pMer>
-  void readVTKPolyData(pMer &, std::string);
+
+  void writeVTKPolyData(std::string,const Polymer &);
+
+  void readVTKPolyData(Polymer &, std::string);
   
   void writeVTKcollectionHeader(const std::string);
   void writeVTKcollectionMiddle(const std::string,
@@ -18,12 +20,8 @@ namespace ioVTK {
   void writeVTKcollectionFooter(const std::string);
   void restartVTKcollection(const std::string );
   
-
-  
 }
 
 };
-
-#include "iovtk.tpp"
 
 #endif

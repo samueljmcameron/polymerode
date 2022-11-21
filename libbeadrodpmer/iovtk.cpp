@@ -5,11 +5,13 @@
 
 #include <algorithm>
 
+#include "iovtk.hpp"
+
 namespace BeadRodPmer {
 
 /* Simple function to write a vtk file with binary data. */
-template <typename pMer>
-void ioVTK::writeVTKPolyData(std::string fname,const pMer &pmer)
+
+void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
 /*============================================================================*/
 /*
   Write scalar image data to a vtk (and paraview) compatible file
@@ -171,8 +173,8 @@ void ioVTK::restartVTKcollection(const std::string fname)
 
 
 /* Simple function to write a vtk file with binary data. */
-template <typename pMer>
-void ioVTK::readVTKPolyData(pMer &pmer,std::string fname)
+
+void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
 /*============================================================================*/
 /*
   Read poly data to a vtk (and paraview) compatible file
