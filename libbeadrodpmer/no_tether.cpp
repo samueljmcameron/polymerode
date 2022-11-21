@@ -55,7 +55,7 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
 
 
 int NoTether::single_step(double t, double dt,
-			  const std::vector<std::vector<double>> & dFdX_i,
+			  const std::vector<Eigen::Vector3d> & dFdX_i,
 			  int itermax, int numtries,bool throw_exception)
 {
 
@@ -102,7 +102,7 @@ int NoTether::single_step(double t, double dt,
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
     for (int i = 0; i < get_Nbeads(); i++) 
-      atoms[i].R = Rtmp[i];
+      atoms.xs.col(i) = tmp_xs.col(i);
 
     compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
@@ -429,24 +429,21 @@ void NoTether::init_atoms_rand()
       diffbasis(1) = diffbasis(2) = 0;
     }
     
-    bonds[mu].rod(0) = diffbasis(0)*u(0) + diffbasis(1)*v(0) + diffbasis(2)*w(0);
-    bonds[mu].rod(1) = diffbasis(0)*u(1) + diffbasis(1)*v(1) + diffbasis(2)*w(1);
-    bonds[mu].rod(2) = diffbasis(0)*u(2) + diffbasis(1)*v(2) + diffbasis(2)*w(2);
+    atoms.bonds(0,mu) = diffbasis(0)*u(0) + diffbasis(1)*v(0) + diffbasis(2)*w(0);
+    atoms.bonds(1,mu) = diffbasis(0)*u(1) + diffbasis(1)*v(1) + diffbasis(2)*w(1);
+    atoms.bonds(2,mu) = diffbasis(0)*u(2) + diffbasis(1)*v(2) + diffbasis(2)*w(2);
     
-    u = bonds[mu].rod;
+    u = atoms.bonds.col(mu);
 
   
   }
 
-  
-  atoms[0].R(0) = x0(0);
-  atoms[0].R(1) = x0(1);
-
-  atoms[0].R(2) = x0(2);
+  atoms.xs.col(0) = x0;
+;
 
 
   for (int mu = 0; mu< Nbeads-1; mu++) {
-    atoms[mu+1].R = atoms[mu].R + bondlength*bonds[mu].rod;
+    atoms.xs.col(mu+1) = atoms.xs.col(mu) + bondlength*atoms.bonds.col(mu);
   }
 
   // shift so that centre of mass is halfway between the two end points specified
@@ -454,13 +451,13 @@ void NoTether::init_atoms_rand()
   Eigen::Vector3d com = {0,0,0};
 
   for (int i = 0; i < Nbeads; i++) {
-    com += atoms[i].R;
+    com += atoms.xs.col(i);
   }
 
   com /= Nbeads;
 
   for (int i = 0; i < Nbeads; i++) {
-    atoms[i].R = atoms[i].R + (x0 + xN)/2 - com;
+    atoms.xs.col(i) = atoms.xs.col(i) + (x0 + xN)/2 - com;
   }  
     
   return;
@@ -478,7 +475,7 @@ void NoTether::init_atoms_line()
   
   double t1 = 0.5*(1-(Nbeads-1)*bondlength/length_init);
   for (int i = 0; i < Nbeads; i++) 
-    atoms[i].R = x0 + (xN-x0)*(t1+i*bondlength/length_init);
+    atoms.xs.col(i) = x0 + (xN-x0)*(t1+i*bondlength/length_init);
     
   return;
 
@@ -552,9 +549,9 @@ void NoTether::init_atoms_caret()
 
     // integer division rounds toward zero
     if (i < Nbeads/2) {
-      atoms[i].R = x0 + 2*alpha*tp;
+      atoms.xs.col(i) = x0 + 2*alpha*tp;
     } else {
-      atoms[i].R = xN + 2*beta*(1-tp);
+      atoms.xs.col(i) = xN + 2*beta*(1-tp);
     }
   }
   return;

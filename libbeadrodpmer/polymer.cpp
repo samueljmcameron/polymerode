@@ -123,10 +123,12 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
   
   
     
-  atoms = std::vector<Atom> (Nbeads);
-  bonds = std::vector<Bond>(Nbeads-1);
-  tmpbonds = std::vector<Bond>(Nbeads-1);
-  Rtmp.resize(Nbeads);
+  atoms.resize(Nbeads);
+
+  tmp_bonds.resize(Eigen::NoChange,Nbeads-1);
+  tmp_xs.resize(Eigen::NoChange,Nbeads);
+
+
   costhetas.resize(Nbeads-2);
   k_effs.resize(Nbeads-2);
   end_inverses.resize(6);
@@ -151,10 +153,10 @@ void Polymer::compute_tangents_and_friction()
   double tangentnorm;
 
 
-  bonds[0].rod = (atoms[1].R-atoms[0].R)/bondlength;
+  atoms.bonds.col(0) = (atoms.xs.col(1)-atoms.xs.col(0))/bondlength;
   
-  tangentnorm = sqrt(bonds[0].rod.dot(bonds[0].rod));
-  atoms[0].tangent = bonds[0].rod/tangentnorm;
+  tangentnorm = sqrt(atoms.bonds.col(0).dot(atoms.bonds.col(0)));
+  atoms.tangents.col(0) = atoms.bonds.col(0)/tangentnorm;
 
 
   single_inv_friction(0);
@@ -162,22 +164,22 @@ void Polymer::compute_tangents_and_friction()
 
   for (int i = 1; i < Nbeads-1; i++) {
 
-    bonds[i].rod = (atoms[i+1].R-atoms[i].R)/bondlength;
-    costhetas(i-1) = bonds[i].rod.dot(bonds[i-1].rod);
+    atoms.bonds.col(i) = (atoms.xs.col(i+1)-atoms.xs.col(i))/bondlength;
+    costhetas(i-1) = atoms.bonds.col(i).dot(atoms.bonds.col(i-1));
       
-    tangentnorm = sqrt((bonds[i].rod+bonds[i-1].rod
-			).dot(bonds[i].rod+bonds[i-1].rod));
+    tangentnorm = sqrt((atoms.bonds.col(i)+atoms.bonds.col(i-1)
+			).dot(atoms.bonds.col(i)+atoms.bonds.col(i-1)));
 
 
-    atoms[i].tangent = (bonds[i].rod+bonds[i-1].rod)/tangentnorm;
+    atoms.tangents.col(i) = (atoms.bonds.col(i)+atoms.bonds.col(i-1))/tangentnorm;
 
     single_inv_friction(i);
 
   }
   
 
-  tangentnorm = sqrt(bonds[Nbeads-2].rod.dot(bonds[Nbeads-2].rod));
-  atoms[Nbeads-1].tangent = bonds[Nbeads-2].rod/tangentnorm;
+  tangentnorm = sqrt(atoms.bonds.col(Nbeads-2).dot(atoms.bonds.col(Nbeads-2)));
+  atoms.tangents.col(Nbeads-1) = atoms.bonds.col(Nbeads-2)/tangentnorm;
 
   single_inv_friction(Nbeads-1);
   
@@ -208,9 +210,9 @@ void Polymer::set_unprojected_noise(double Delta_t)
       rands(j) = dist(gen);
     }
     
-    atoms[i].unprojected_noise = dum*(perp*rands
-				      +(para-perp)*(atoms[i].tangent.dot(rands))
-				      *atoms[i].tangent);
+    atoms.unprojected_noises.col(i) = dum*(perp*rands
+				      +(para-perp)*(atoms.tangents.col(i).dot(rands))
+				      *atoms.tangents.col(i));
 
   }
 
@@ -228,64 +230,45 @@ void Polymer::set_unprojected_noise(double Delta_t)
 void Polymer::compute_uc_forces()
 {
 
-  atoms[0].Fpot = (end_inverses(0)*bonds[0].rod*(bonds[0].rod(0))
-		   +end_inverses(1)*bonds[0].rod*(bonds[0].rod(1))
-		   +end_inverses(2)*bonds[0].rod*(bonds[0].rod(2))
-		   -1*k_effs(0)*(bonds[1].rod-costhetas(0)*bonds[0].rod));
+  atoms.Fpots.col(0) = (end_inverses({0,1,2}).dot(atoms.bonds.col(0))*atoms.bonds.col(0)
+		   -1*k_effs(0)*(atoms.bonds.col(1)-costhetas(0)*atoms.bonds.col(0)));
 
-  atoms[0].Fpot(0) += -1*end_inverses(0);
-  atoms[0].Fpot(1) += -1*end_inverses(1);
-  atoms[0].Fpot(2) += -1*end_inverses(2);
+  atoms.Fpots.col(0) -= end_inverses({0,1,2});
 
-  atoms[1].Fpot = (-1*end_inverses(0)*bonds[0].rod*(bonds[0].rod(0))
-		-end_inverses(1)*bonds[0].rod*(bonds[0].rod(1))
-		-end_inverses(2)*bonds[0].rod*(bonds[0].rod(2))
-		+k_effs(0)*(bonds[1].rod-costhetas(0)*bonds[0].rod
-			    - (bonds[0].rod-costhetas(0)*bonds[1].rod))
-		- k_effs(1)*(bonds[2].rod-costhetas(1)*bonds[1].rod));
+  atoms.Fpots.col(1) = (-end_inverses({0,1,2}).dot(atoms.bonds.col(0))*atoms.bonds.col(0)
+		   +k_effs(0)*(atoms.bonds.col(1)-costhetas(0)*atoms.bonds.col(0)
+			       - (atoms.bonds.col(0)-costhetas(0)*atoms.bonds.col(1)))
+		   - k_effs(1)*(atoms.bonds.col(2)-costhetas(1)*atoms.bonds.col(1)));
 
 
-  atoms[1].Fpot(0) += end_inverses(0);
-  atoms[1].Fpot(1) += end_inverses(1);
-  atoms[1].Fpot(2) += end_inverses(2);
-
-  
+  atoms.Fpots.col(1) += end_inverses({0,1,2});
 
   			
   for (int k = 2; k < Nbeads-2; k++) {
 
-    atoms[k].Fpot = (k_effs(k-1)*(bonds[k].rod-costhetas(k-1)*bonds[k-1].rod
-				  -(bonds[k-1].rod-costhetas(k-1)*bonds[k].rod))
-		     -k_effs(k)*(bonds[k+1].rod-costhetas(k)*bonds[k].rod)
-		     +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod));
+    atoms.Fpots.col(k) = (k_effs(k-1)*(atoms.bonds.col(k)-costhetas(k-1)*atoms.bonds.col(k-1)
+				  -(atoms.bonds.col(k-1)-costhetas(k-1)*atoms.bonds.col(k)))
+		     -k_effs(k)*(atoms.bonds.col(k+1)-costhetas(k)*atoms.bonds.col(k))
+		     +k_effs(k-2)*(atoms.bonds.col(k-2)-costhetas(k-2)*atoms.bonds.col(k-1)));
     
   }
 
   int k = Nbeads-2;
   
-  atoms[k].Fpot = (-1*end_inverses(3)*bonds[k].rod*bonds[k].rod(0)
-		   -end_inverses(4)*bonds[k].rod*bonds[k].rod(1)
-		   -end_inverses(5)*bonds[k].rod*bonds[k].rod(2)
-		   +k_effs(k-1)*(bonds[k].rod-costhetas(k-1)*bonds[k-1].rod
-				 -(bonds[k-1].rod-costhetas(k-1)*bonds[k].rod))
-		   +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod));
-
-  atoms[k].Fpot(0) += end_inverses(3);
-  atoms[k].Fpot(1) += end_inverses(4);
-  atoms[k].Fpot(2) += end_inverses(5);
+  atoms.Fpots.col(k) = (-end_inverses({3,4,5}).dot(atoms.bonds.col(k))*atoms.bonds.col(k)
+		   +k_effs(k-1)*(atoms.bonds.col(k)-costhetas(k-1)*atoms.bonds.col(k-1)
+				 -(atoms.bonds.col(k-1)-costhetas(k-1)*atoms.bonds.col(k)))
+		   +k_effs(k-2)*(atoms.bonds.col(k-2)-costhetas(k-2)*atoms.bonds.col(k-1)));
+  
+  atoms.Fpots.col(k) += end_inverses({3,4,5});
 
   k = Nbeads-1;
 
-  atoms[k].Fpot = (end_inverses(3)*bonds[k-1].rod*bonds[k-1].rod(0)
-		   +end_inverses(4)*bonds[k-1].rod*bonds[k-1].rod(1)
-		   +end_inverses(5)*bonds[k-1].rod*bonds[k-1].rod(2)
-		   +k_effs(k-2)*(bonds[k-2].rod-costhetas(k-2)*bonds[k-1].rod));
+  atoms.Fpots.col(k) = (end_inverses({3,4,5}).dot(atoms.bonds.col(k-1))*atoms.bonds.col(k-1)
+		   +k_effs(k-2)*(atoms.bonds.col(k-2)-costhetas(k-2)*atoms.bonds.col(k-1)));
 
 
-  atoms[k].Fpot(0) -= end_inverses(3);
-  atoms[k].Fpot(1) -= end_inverses(4);
-  atoms[k].Fpot(2) -= end_inverses(5);
-  
+  atoms.Fpots.col(k) -= end_inverses({3,4,5});
 
   return;
   
@@ -295,21 +278,19 @@ void Polymer::compute_uc_forces()
 void Polymer::single_inv_friction(int i)
 {
   double tmp = 1./zpara-1./zperp;
-  atoms[i].friction = tmp*atoms[i].tangent*atoms[i].tangent.transpose();
+  atoms.frictions[i] = tmp*atoms.tangents.col(i)*atoms.tangents.col(i).transpose();
   
   for (int j = 0; j < 3; j++ )
 
-    atoms[i].friction(j,j) += 1./zperp;
+    atoms.frictions[i](j,j) += 1./zperp;
 
   return;
 
 }
 
-void Polymer::add_external_force(const std::vector<double> &dFdX, int i)
+void Polymer::add_external_force(const Eigen::Vector3d &dFdX, int i)
 {
-  atoms[i].Fpot(0) += -dFdX[0];
-  atoms[i].Fpot(1) += -dFdX[1];
-  atoms[i].Fpot(2) += -dFdX[2];
+  atoms.Fpots.col(i) += -dFdX;
   return;
 
 }
@@ -318,11 +299,11 @@ double Polymer::Hhat_diag_val(int mu)
 {
 
 
-  double tmp1 = atoms[mu].tangent.dot(bonds[mu].rod);
+  double tmp1 = atoms.tangents.col(mu).dot(atoms.bonds.col(mu));
   tmp1 = tmp1*tmp1;
 
 
-  double tmp2 =  atoms[mu+1].tangent.dot(bonds[mu].rod);
+  double tmp2 =  atoms.tangents.col(mu+1).dot(atoms.bonds.col(mu));
   tmp2 = tmp2*tmp2;
 
 
@@ -336,17 +317,17 @@ double Polymer::dCdlambda_diag_val(int mu)
 {
 
 
-  double tmp1 = atoms[mu].tangent.dot(tmpbonds[mu].rod);
-  tmp1 = tmp1*atoms[mu].tangent.dot(bonds[mu].rod);
+  double tmp1 = atoms.tangents.col(mu).dot(tmp_bonds.col(mu));
+  tmp1 = tmp1*atoms.tangents.col(mu).dot(atoms.bonds.col(mu));
 
 
-  double tmp2 =  atoms[mu+1].tangent.dot(tmpbonds[mu].rod);
-  tmp2 = tmp2*atoms[mu+1].tangent.dot(bonds[mu].rod);
+  double tmp2 =  atoms.tangents.col(mu+1).dot(tmp_bonds.col(mu));
+  tmp2 = tmp2*atoms.tangents.col(mu+1).dot(atoms.bonds.col(mu));
 
-  double tmp3 = tmpbonds[mu].rod.dot(bonds[mu].rod);
+  double tmp3 = tmp_bonds.col(mu).dot(atoms.bonds.col(mu));
 
 
-  return (2*tmp3/zperp + (1./zpara-1./zperp)*(tmp1+tmp2))/tmpbonds[mu].rod.norm();
+  return (2*tmp3/zperp + (1./zpara-1./zperp)*(tmp1+tmp2))/tmp_bonds.col(mu).norm();
 
 }
 
@@ -358,9 +339,9 @@ double Polymer::dCdlambda_diag_val(int mu)
 double Polymer::Hhat_loweroff_val(int mu)
 {
 
-  double tmp1 = bonds[mu-1].rod.dot(bonds[mu].rod);
-  double tmp2 = bonds[mu-1].rod.dot(atoms[mu].tangent);
-  double tmp3 = atoms[mu].tangent.dot(bonds[mu].rod);
+  double tmp1 = atoms.bonds.col(mu-1).dot(atoms.bonds.col(mu));
+  double tmp2 = atoms.bonds.col(mu-1).dot(atoms.tangents.col(mu));
+  double tmp3 = atoms.tangents.col(mu).dot(atoms.bonds.col(mu));
 
   return -1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3;
 
@@ -369,11 +350,11 @@ double Polymer::Hhat_loweroff_val(int mu)
 double Polymer::dCdlambda_loweroff_val(int mu)
 {
 
-  double tmp1 = bonds[mu-1].rod.dot(tmpbonds[mu].rod);
-  double tmp2 = bonds[mu-1].rod.dot(atoms[mu].tangent);
-  double tmp3 = atoms[mu].tangent.dot(tmpbonds[mu].rod);
+  double tmp1 = atoms.bonds.col(mu-1).dot(tmp_bonds.col(mu));
+  double tmp2 = atoms.bonds.col(mu-1).dot(atoms.tangents.col(mu));
+  double tmp3 = atoms.tangents.col(mu).dot(tmp_bonds.col(mu));
 
-  return (-1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3)/tmpbonds[mu].rod.norm();
+  return (-1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3)/tmp_bonds.col(mu).norm();
 
 }
 
@@ -381,11 +362,11 @@ double Polymer::dCdlambda_loweroff_val(int mu)
 double Polymer::dCdlambda_upperoff_val(int mu)
 {
 
-  double tmp1 = bonds[mu].rod.dot(tmpbonds[mu-1].rod);
-  double tmp2 = tmpbonds[mu-1].rod.dot(atoms[mu].tangent);
-  double tmp3 = atoms[mu].tangent.dot(bonds[mu].rod);
+  double tmp1 = atoms.bonds.col(mu).dot(tmp_bonds.col(mu-1));
+  double tmp2 = tmp_bonds.col(mu-1).dot(atoms.tangents.col(mu));
+  double tmp3 = atoms.tangents.col(mu).dot(atoms.bonds.col(mu));
 
-  return (-1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3)/tmpbonds[mu-1].rod.norm();
+  return (-1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3)/tmp_bonds.col(mu-1).norm();
 
 }
 
@@ -397,8 +378,8 @@ double Polymer::Hhat_endblocks(int first, int second,int mu)
 
   if (first == second) extra = 1;
   
-  return (extra/zperp + (1./zpara-1./zperp)*atoms[mu].tangent(first)
-	  *atoms[mu].tangent(second));
+  return (extra/zperp + (1./zpara-1./zperp)*atoms.tangents(first,mu)
+	  *atoms.tangents(second,mu));
 
 }
 
@@ -406,10 +387,10 @@ double Polymer::Hhat_endblocks(int first, int second,int mu)
 double Polymer::Hhat_leftside(int first)
 {
 
-  double tmp =  atoms[0].tangent.dot(bonds[0].rod)*atoms[0].tangent(first);
+  double tmp =  atoms.tangents.col(0).dot(atoms.bonds.col(0))*atoms.tangents(first,0);
 
   
-  return -1*(1./zpara-1./zperp)*tmp - bonds[0].rod(first)/zperp;
+  return -1*(1./zpara-1./zperp)*tmp - atoms.bonds(first,0)/zperp;
 
 }
 
@@ -417,10 +398,10 @@ double Polymer::Hhat_leftside(int first)
 double Polymer::dCdlambda_leftside(int first)
 {
 
-  double tmp =  atoms[0].tangent.dot(tmpbonds[0].rod)*atoms[0].tangent(first);
+  double tmp =  atoms.tangents.col(0).dot(tmp_bonds.col(0))*atoms.tangents(first,0);
 
   
-  return (-1*(1./zpara-1./zperp)*tmp - tmpbonds[0].rod(first)/zperp)/tmpbonds[0].rod.norm();
+  return (-1*(1./zpara-1./zperp)*tmp - tmp_bonds(first,0)/zperp)/tmp_bonds.col(0).norm();
 
 }
 
@@ -429,10 +410,10 @@ double Polymer::dCdlambda_leftside(int first)
 double Polymer::Hhat_bottomside(int first)
 {
   
-  double tmp =  atoms[Nbeads-1].tangent.dot(bonds[Nbeads-2].rod)*atoms[Nbeads-1].tangent(first);
+  double tmp =  atoms.tangents.col(Nbeads-1).dot(atoms.bonds.col(Nbeads-2))*atoms.tangents(first,Nbeads-1);
   
   
-  return (1./zpara-1./zperp)*tmp + bonds[Nbeads-2].rod(first)/zperp;
+  return (1./zpara-1./zperp)*tmp + atoms.bonds(first,Nbeads-2)/zperp;
   
 }
 
@@ -440,12 +421,12 @@ double Polymer::Hhat_bottomside(int first)
 double Polymer::dCdlambda_bottomside(int first)
 {
   
-  double tmp =  atoms[Nbeads-1].tangent.dot(tmpbonds[Nbeads-2].rod)
-    *atoms[Nbeads-1].tangent(first);
+  double tmp =  atoms.tangents.col(Nbeads-1).dot(tmp_bonds.col(Nbeads-2))
+    *atoms.tangents(first,Nbeads-1);
   
   
-  return ((1./zpara-1./zperp)*tmp + tmpbonds[Nbeads-2].rod(first)/zperp)
-    /tmpbonds[Nbeads-2].rod.norm();
+  return ((1./zpara-1./zperp)*tmp + tmp_bonds(first,Nbeads-2)/zperp)
+    /tmp_bonds.col(Nbeads-2).norm();
   
 }
   
@@ -459,8 +440,8 @@ void Polymer::set_rhs_of_G(int offset)
   
   
   for (int i = 0; i < Nbeads-1; i++) {
-    rhs_of_G(i+offset) = bonds[i].rod.dot(atoms[i+1].unprojected_noise
-					  -atoms[i].unprojected_noise);
+    rhs_of_G(i+offset) = atoms.bonds.col(i).dot(atoms.unprojected_noises.col(i+1)
+					  -atoms.unprojected_noises.col(i));
     
   }
   
@@ -553,10 +534,10 @@ void Polymer::set_rhs_of_Hhat(int offset)
   for (int i = 0; i< Nbeads-1; i++) {
 
 
-    rhs_of_Hhat(i+offset) = bonds[i].rod.dot(atoms[i+1].friction*(atoms[i+1].Fpot
-								  +atoms[i+1].noise)
-					     -atoms[i].friction*(atoms[i].Fpot
-								 +atoms[i].noise));
+    rhs_of_Hhat(i+offset) = atoms.bonds.col(i).dot(atoms.frictions[i+1]*(atoms.Fpots.col(i+1)
+								  +atoms.noises.col(i+1))
+					     -atoms.frictions[i]*(atoms.Fpots.col(i)
+								 +atoms.noises.col(i)));
     
   }
 
@@ -689,22 +670,22 @@ void Polymer::update_dCdlambda(double Delta_t,int offset)
 void Polymer::update_noise(int offset)
 {
   int i = 0;
-  atoms[i].noise = (atoms[i].unprojected_noise
-		    + dummy_for_noise(i+offset)*bonds[i].rod);
-
+  atoms.noises.col(i) = (atoms.unprojected_noises.col(i)
+			 + dummy_for_noise(i+offset)*atoms.bonds.col(i));
+  
   
   
   for (i = 1; i < Nbeads-1; i++) {
-    atoms[i].noise = (atoms[i].unprojected_noise
-		      + dummy_for_noise(i+offset)*bonds[i].rod
-		      - dummy_for_noise(i+offset-1)*bonds[i-1].rod);
+    atoms.noises.col(i) = (atoms.unprojected_noises.col(i)
+			   + dummy_for_noise(i+offset)*atoms.bonds.col(i)
+			   - dummy_for_noise(i+offset-1)*atoms.bonds.col(i-1));
   }
 
 
   i = Nbeads-1;
 
-  atoms[i].noise = (atoms[i].unprojected_noise
-		    - dummy_for_noise(i+offset-1)*bonds[i-1].rod);
+  atoms.noises.col(i) = (atoms.unprojected_noises.col(i)
+			 - dummy_for_noise(i+offset-1)*atoms.bonds.col(i-1));
   return;
 
 }
@@ -722,28 +703,28 @@ void Polymer::initial_integrate(double Delta_t,int offset, PTYPE cflag)
 
   
   int i = 0;
-  Rtmp[0] = atoms[0].R;
+  tmp_xs.col(0) = atoms.xs.col(0);
 
-  atoms[0].t_force = tension(offset)*bonds[0].rod;
+  atoms.t_forces.col(0) = tension(offset)*atoms.bonds.col(0);
 
-  if (cflag == SINGLE || cflag == DOUBLE) atoms[0].t_force -= tension({0,1,2});
+  if (cflag == SINGLE || cflag == DOUBLE) atoms.t_forces.col(0) -= tension({0,1,2});
 
-  atoms[0].R += tmp*atoms[0].friction*(atoms[0].Fpot+atoms[0].noise+atoms[0].t_force);
+  atoms.xs.col(0) += tmp*atoms.frictions[0]*(atoms.Fpots.col(0)+atoms.noises.col(0)+atoms.t_forces.col(0));
 
   i = 1;
-  Rtmp[i] = atoms[i].R;
+  tmp_xs.col(i) = atoms.xs.col(i);
 
 
-  atoms[i].t_force = tension(offset+i)*bonds[i].rod-tension(offset+i-1)*bonds[i-1].rod;
+  atoms.t_forces.col(i) = tension(offset+i)*atoms.bonds.col(i)-tension(offset+i-1)*atoms.bonds.col(i-1);
   
   
-  atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
+  atoms.xs.col(i) += tmp*atoms.frictions[i]*(atoms.Fpots.col(i)+atoms.noises.col(i)+atoms.t_forces.col(i));
 
-  bonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-  tmpbonds[i-1].rod = bonds[i-1].rod;
+  atoms.bonds.col(i-1) = (atoms.xs.col(i)-atoms.xs.col(i-1))/bondlength;
+  tmp_bonds.col(i-1) = atoms.bonds.col(i-1);
   
-  tangentnorm = sqrt(bonds[i-1].rod.dot(bonds[i-1].rod));
-  atoms[i-1].tangent = bonds[i-1].rod/tangentnorm;
+  tangentnorm = sqrt(atoms.bonds.col(i-1).dot(atoms.bonds.col(i-1)));
+  atoms.tangents.col(i-1) = atoms.bonds.col(i-1)/tangentnorm;
 
 
   // compute friction with new values of R on bead i-1
@@ -751,25 +732,25 @@ void Polymer::initial_integrate(double Delta_t,int offset, PTYPE cflag)
   
   for (i = 2; i < Nbeads-1; i++) {
 
-    Rtmp[i] = atoms[i].R;
+    tmp_xs.col(i) = atoms.xs.col(i);
 
-    atoms[i].t_force = tension(offset+i)*bonds[i].rod-tension(offset-1+i)*bonds[i-1].rod;
-
-
-    atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-
-    bonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-    tmpbonds[i-1].rod = bonds[i-1].rod;
-
-    costhetas(i-2) = bonds[i-1].rod.dot(bonds[i-2].rod)
-      /(bonds[i-1].rod.norm()*bonds[i-2].rod.norm());
+    atoms.t_forces.col(i) = tension(offset+i)*atoms.bonds.col(i)-tension(offset-1+i)*atoms.bonds.col(i-1);
 
 
-    tangentnorm = sqrt((bonds[i-1].rod+bonds[i-2].rod
-			).dot(bonds[i-1].rod+bonds[i-2].rod));
+    atoms.xs.col(i) += tmp*atoms.frictions[i]*(atoms.Fpots.col(i)+atoms.noises.col(i)+atoms.t_forces.col(i));
+
+    atoms.bonds.col(i-1) = (atoms.xs.col(i)-atoms.xs.col(i-1))/bondlength;
+    tmp_bonds.col(i-1) = atoms.bonds.col(i-1);
+
+    costhetas(i-2) = atoms.bonds.col(i-1).dot(atoms.bonds.col(i-2))
+      /(atoms.bonds.col(i-1).norm()*atoms.bonds.col(i-2).norm());
 
 
-    atoms[i-1].tangent = (bonds[i-1].rod+bonds[i-2].rod)/tangentnorm;
+    tangentnorm = sqrt((atoms.bonds.col(i-1)+atoms.bonds.col(i-2)
+			).dot(atoms.bonds.col(i-1)+atoms.bonds.col(i-2)));
+
+
+    atoms.tangents.col(i-1) = (atoms.bonds.col(i-1)+atoms.bonds.col(i-2))/tangentnorm;
 
     single_inv_friction(i-1);
 
@@ -778,36 +759,36 @@ void Polymer::initial_integrate(double Delta_t,int offset, PTYPE cflag)
 
   i = Nbeads -1;
 
-  Rtmp[i] = atoms[i].R;
+  tmp_xs.col(i) = atoms.xs.col(i);
 
-  atoms[i].t_force = -tension(offset-1+i)*bonds[i-1].rod;
+  atoms.t_forces.col(i) = -tension(offset-1+i)*atoms.bonds.col(i-1);
 
   if (cflag == DOUBLE) {
     int ind = offset+Nbeads-1;
-    atoms[i].t_force -= tension({ind,ind+1,ind+2});
+    atoms.t_forces.col(i) -= tension({ind,ind+1,ind+2});
   }
 
 
-  atoms[i].R += tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
+  atoms.xs.col(i) += tmp*atoms.frictions[i]*(atoms.Fpots.col(i)+atoms.noises.col(i)+atoms.t_forces.col(i));
 
-  bonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
-  tmpbonds[i-1].rod = bonds[i-1].rod;
+  atoms.bonds.col(i-1) = (atoms.xs.col(i)-atoms.xs.col(i-1))/bondlength;
+  tmp_bonds.col(i-1) = atoms.bonds.col(i-1);
 
 
-  costhetas(i-2) = bonds[i-1].rod.dot(bonds[i-2].rod)
-    /(bonds[i-1].rod.norm()*bonds[i-2].rod.norm());
+  costhetas(i-2) = atoms.bonds.col(i-1).dot(atoms.bonds.col(i-2))
+    /(atoms.bonds.col(i-1).norm()*atoms.bonds.col(i-2).norm());
 
   
-  tangentnorm = sqrt((bonds[i-1].rod+bonds[i-2].rod
-		      ).dot(bonds[i-1].rod+bonds[i-2].rod));
+  tangentnorm = sqrt((atoms.bonds.col(i-1)+atoms.bonds.col(i-2)
+		      ).dot(atoms.bonds.col(i-1)+atoms.bonds.col(i-2)));
   
   
-  atoms[i-1].tangent = (bonds[i-1].rod+bonds[i-2].rod)/tangentnorm;
+  atoms.tangents.col(i-1) = (atoms.bonds.col(i-1)+atoms.bonds.col(i-2))/tangentnorm;
   
   single_inv_friction(i-1);
   
-  tangentnorm = sqrt(bonds[i-1].rod.dot(bonds[i-1].rod));
-  atoms[i].tangent = bonds[i-1].rod/tangentnorm;
+  tangentnorm = sqrt(atoms.bonds.col(i-1).dot(atoms.bonds.col(i-1)));
+  atoms.tangents.col(i) = atoms.bonds.col(i-1)/tangentnorm;
 
   single_inv_friction(i);
 
@@ -823,36 +804,36 @@ void Polymer::final_integrate(double Delta_t, int offset,PTYPE cflag)
   double tmp = Delta_t;
 
 
-  atoms[0].t_force= tension(offset)*bonds[0].rod;
+  atoms.t_forces.col(0)= tension(offset)*atoms.bonds.col(0);
 
   if (cflag == SINGLE || cflag == DOUBLE) {
-    atoms[0].t_force -= tension({0,1,2});
+    atoms.t_forces.col(0) -= tension({0,1,2});
   }
 
-  atoms[0].R = Rtmp[0] + tmp*atoms[0].friction*(atoms[0].Fpot+atoms[0].noise+atoms[0].t_force);
+  atoms.xs.col(0) = tmp_xs.col(0) + tmp*atoms.frictions[0]*(atoms.Fpots.col(0)+atoms.noises.col(0)+atoms.t_forces.col(0));
 
 
     
   for (int i = 1; i < Nbeads-1; i++) {
 
-    atoms[i].t_force = tension(offset+i)*bonds[i].rod-tension(offset-1+i)*bonds[i-1].rod;
+    atoms.t_forces.col(i) = tension(offset+i)*atoms.bonds.col(i)-tension(offset-1+i)*atoms.bonds.col(i-1);
 
-    atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-    tmpbonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
+    atoms.xs.col(i) = tmp_xs.col(i) + tmp*atoms.frictions[i]*(atoms.Fpots.col(i)+atoms.noises.col(i)+atoms.t_forces.col(i));
+    tmp_bonds.col(i-1) = (atoms.xs.col(i)-atoms.xs.col(i-1))/bondlength;
     
   }
 
   int i = Nbeads -1;
 
-  atoms[i].t_force = -tension(offset-1+i)*bonds[i-1].rod;
+  atoms.t_forces.col(i) = -tension(offset-1+i)*atoms.bonds.col(i-1);
 
   if (cflag == DOUBLE) {
     int ind = offset+Nbeads-1;
-    atoms[i].t_force -= tension({ind,ind+1,ind+2});
+    atoms.t_forces.col(i) -= tension({ind,ind+1,ind+2});
   }
 
-  atoms[i].R = Rtmp[i] + tmp*atoms[i].friction*(atoms[i].Fpot+atoms[i].noise+atoms[i].t_force);
-  tmpbonds[i-1].rod = (atoms[i].R-atoms[i-1].R)/bondlength;
+  atoms.xs.col(i) = tmp_xs.col(i) + tmp*atoms.frictions[i]*(atoms.Fpots.col(i)+atoms.noises.col(i)+atoms.t_forces.col(i));
+  tmp_bonds.col(i-1) = (atoms.xs.col(i)-atoms.xs.col(i-1))/bondlength;
 
   
   return;
@@ -865,7 +846,7 @@ void Polymer::final_integrate(double Delta_t, int offset,PTYPE cflag)
 void Polymer::calculate_constraint_errors(int offset)
 {
   for (int mu = 1; mu < Nbeads; mu++) {
-    constraint_errors(mu-1+offset) = (atoms[mu].R-atoms[mu-1].R).norm()-bondlength;
+    constraint_errors(mu-1+offset) = (atoms.xs.col(mu)-atoms.xs.col(mu-1)).norm()-bondlength;
   }
   
   return;
@@ -877,11 +858,11 @@ void Polymer::rescale_positions(bool fromfront)
   
   if (fromfront) {
     for (int i = 1; i < Nbeads; i++) {
-      atoms[i].R = atoms[i-1].R + bondlength*bonds[i-1].rod;
+      atoms.xs.col(i) = atoms.xs.col(i-1) + bondlength*atoms.bonds.col(i-1);
     }
   } else {
     for (int i = Nbeads-2; i >= 0; i--) {
-      atoms[i].R = atoms[i+1].R - bondlength*bonds[i-1].rod;
+      atoms.xs.col(i) = atoms.xs.col(i+1) - bondlength*atoms.bonds.col(i-1);
     }
   }
   return;

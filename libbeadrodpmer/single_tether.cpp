@@ -49,7 +49,7 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
 
 
 int SingleTether::single_step(double t,double dt,
-			      const std::vector<std::vector<double>> & dFdX_i,
+			      const std::vector<Eigen::Vector3d> & dFdX_i,
 			      int itermax, int numtries,bool throw_exception)
 {
 
@@ -88,14 +88,14 @@ int SingleTether::single_step(double t,double dt,
   compute_tension({0,0,0});
 
   
-  int iterations = correct_tension(dt,atoms[0].R,itermax,1e-8);
+  int iterations = correct_tension(dt,atoms.xs.col(0),itermax,1e-8);
   if (iterations > itermax) {
     numtries -= 1;
     std::cout << "too many iterations when correcting tension at time " << t
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
     for (int i = 0; i < get_Nbeads(); i++) 
-      atoms[i].R = Rtmp[i];
+      atoms.xs.col(i) = tmp_xs.col(i);
 
     compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
@@ -112,7 +112,7 @@ int SingleTether::single_step(double t,double dt,
 
 
 int SingleTether::single_step(double t,double dt,
-			      const std::vector<std::vector<double>> & dFdX_i,
+			      const std::vector<Eigen::Vector3d> & dFdX_i,
 			      std::function<Eigen::Vector3d (double)> X0_t,
 			      std::function<Eigen::Vector3d (double)> dX0dt,
 			      int itermax, int numtries,bool throw_exception)
@@ -159,7 +159,7 @@ int SingleTether::single_step(double t,double dt,
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
     for (int i = 0; i < get_Nbeads(); i++) 
-      atoms[i].R = Rtmp[i];
+      atoms.xs.col(i) = tmp_xs.col(i);
 
     compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,X0_t,dX0dt,itermax,numtries,throw_exception);
@@ -183,7 +183,7 @@ void SingleTether::set_rhs_of_G()
 {
   int offset = 3;
 
-  rhs_of_G({0,1,2}) = atoms[0].unprojected_noise;
+  rhs_of_G({0,1,2}) = atoms.unprojected_noises.col(0);
 
   Polymer::set_rhs_of_G(offset);
   
@@ -224,7 +224,7 @@ std::vector<T> SingleTether::init_G_coeffsmatrix()
   coeffs.push_back(T(offset-1,offset-1,1));
 
 
-  Eigen::Vector3d btmp = bonds[0].rod;
+  Eigen::Vector3d btmp = atoms.bonds.col(0);
   
   coeffs.push_back(T(offset,offset-3,-btmp(0)));
   coeffs.push_back(T(offset,offset-2,-btmp(1)));
@@ -248,9 +248,9 @@ void SingleTether::update_G()
 
   int offset = 3;
 
-  Gmunu.coeffRef(offset,offset-3) = -bonds[0].rod(0);
-  Gmunu.coeffRef(offset,offset-2) = -bonds[0].rod(1);
-  Gmunu.coeffRef(offset,offset-1) = -bonds[0].rod(2);
+  Gmunu.coeffRef(offset,offset-3) = -atoms.bonds(0,0);
+  Gmunu.coeffRef(offset,offset-2) = -atoms.bonds(1,0);
+  Gmunu.coeffRef(offset,offset-1) = -atoms.bonds(2,0);
 
   Polymer::update_G(offset);
   
@@ -264,20 +264,20 @@ void SingleTether::compute_effective_kappa()
 
 
   bDets(Nbeads-1+offset) = 1.0;
-  bDets(Nbeads-2+offset) = 2 - bonds[Nbeads-2].rod.squaredNorm();
+  bDets(Nbeads-2+offset) = 2 - atoms.bonds.col(Nbeads-2).squaredNorm();
   tDets(0) = 1.0;
-  tDets(1) = 2 - bonds[0].rod.squaredNorm();
+  tDets(1) = 2 - atoms.bonds.col(0).squaredNorm();
 
   set_bdets_and_tdets(offset);
   
-  bDets(-1+offset) = bDets(offset)-bonds[0].rod(2)*bonds[0].rod(2)*bDets(1+offset);
-  bDets(-2+offset) = bDets(-1+offset)-bonds[0].rod(1)*bonds[0].rod(1)*bDets(1+offset);
-  bDets(-3+offset) = bDets(-2+offset)-bonds[0].rod(0)*bonds[0].rod(0)*bDets(1+offset);
+  bDets(-1+offset) = bDets(offset)-atoms.bonds(2,0)*atoms.bonds(2,0)*bDets(1+offset);
+  bDets(-2+offset) = bDets(-1+offset)-atoms.bonds(1,0)*atoms.bonds(1,0)*bDets(1+offset);
+  bDets(-3+offset) = bDets(-2+offset)-atoms.bonds(0,0)*atoms.bonds(0,0)*bDets(1+offset);
 
 
   double gDet = bDets(-3+offset);
   
-  end_inverses({0,1,2}) = bonds[0].rod*bDets(1+offset)/(gDet*bondlength);
+  end_inverses({0,1,2}) = atoms.bonds.col(0)*bDets(1+offset)/(gDet*bondlength);
 
   for (int i = 0; i < Nbeads-2; i++) {
     k_effs(i) = (kappa - temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2+offset)/gDet
@@ -304,7 +304,7 @@ void SingleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1)
   int offset = 3;
 
 
-  rhs_of_Hhat({0,1,2}) = atoms[0].friction*(atoms[0].Fpot+atoms[0].noise)-dXdt_at_1; 
+  rhs_of_Hhat({0,1,2}) = atoms.frictions[0]*(atoms.Fpots.col(0)+atoms.noises.col(0))-dXdt_at_1; 
   
   Polymer::set_rhs_of_Hhat(offset);
   
@@ -521,7 +521,7 @@ void SingleTether::compute_noise()
 
   Polymer::update_noise(offset);
 
-  atoms[0].noise -= dummy_for_noise({0,1,2});
+  atoms.noises.col(0) -= dummy_for_noise({0,1,2});
 
 
   return;
@@ -642,7 +642,7 @@ int SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_
 void SingleTether::calculate_constraint_errors(const Eigen::Vector3d & X_of_t_at_1)
 {
   int offset = 3;
-  constraint_errors({0,1,2}) = atoms[0].R-X_of_t_at_1;
+  constraint_errors({0,1,2}) = atoms.xs.col(0)-X_of_t_at_1;
 
   Polymer::calculate_constraint_errors(offset);
 

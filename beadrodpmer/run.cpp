@@ -63,7 +63,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   double t = 0;
 
-  movingEnds move(0.1,100,pmer.atoms[0].R,pmer.atoms[pmer.get_Nbeads()-1].R);
+  movingEnds move(0.1,100,pmer.atoms.xs.col(0),pmer.atoms.xs.col(pmer.get_Nbeads()-1));
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
   auto XN_t = std::bind(&movingEnds::XN_t,&move,std::placeholders::_1);
@@ -72,7 +72,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
   
   
 
-  std::vector<std::vector<double>> dFdX_is;
+  std::vector<Eigen::Vector3d> dFdX_is;
 
   for (int index = 0; index < pmer.nuc_beads.size(); index ++ ) 
     dFdX_is.push_back({0,0,0});
@@ -151,7 +151,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   // since only fixing one end, the XN argument of the move class is ignored
   // so putting in the zero vector {0,0,0} as a placeholder
-  movingEnds move(0.1,100,pmer.atoms[0].R,{0,0,0});
+  movingEnds move(0.1,100,pmer.atoms.xs.col(0),{0,0,0});
 
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
@@ -159,7 +159,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   
 
-  std::vector<std::vector<double>> dFdX_is;
+  std::vector<Eigen::Vector3d> dFdX_is;
 
   for (int index = 0; index < pmer.nuc_beads.size(); index ++ ) 
     dFdX_is.push_back({0,0,0});
@@ -234,7 +234,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
   double t = 0;
 
 
-  std::vector<std::vector<double>> dFdX_is;
+  std::vector<Eigen::Vector3d> dFdX_is;
 
   for (int index = 0; index < pmer.nuc_beads.size(); index ++ ) 
     dFdX_is.push_back({0,0,0});

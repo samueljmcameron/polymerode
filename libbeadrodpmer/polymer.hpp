@@ -3,8 +3,6 @@
 #define BEADRODPMER_POLYMER_HPP
 
 #include "atom.hpp"
-#include "bond.hpp"
-
 
 #include <Eigen/Core>
 #include <Eigen/Sparse>
@@ -22,7 +20,7 @@ typedef Eigen::Triplet<double> T;
   
 
 class Polymer {
-public:
+ public:
   // constructor
   Polymer(const std::vector<std::string> &);
   enum PTYPE {NONE,SINGLE,DOUBLE};
@@ -33,7 +31,7 @@ public:
 
   void single_inv_friction(int);
 
-  void add_external_force(const std::vector<double> &,int);
+  void add_external_force(const Eigen::Vector3d &,int);
 
   int get_Nbeads() const;
   double get_temp() const;
@@ -45,10 +43,7 @@ public:
   Eigen::Vector3d get_x0() const;
   Eigen::Vector3d get_xN() const;
 
-  std::vector<Atom> atoms;
-  std::vector<Bond> bonds;
-  
-  std::vector<Eigen::Vector3d> Rtmp;    // temporary storate for midstep
+  Atom atoms;
 
   
   std::vector<int> nuc_beads;
@@ -88,7 +83,7 @@ public:
 
 
   virtual int single_step(double, double,
-			  const std::vector<std::vector<double>> &,
+			  const std::vector<Eigen::Vector3d> &,
 			  int, int , bool ) = 0;
 
 
@@ -118,9 +113,6 @@ protected:
 
   std::uniform_real_distribution<double> dist;
   
-  std::vector<Bond> tmpbonds;
-
-
 
 
   virtual void compute_noise() = 0;
@@ -167,6 +159,7 @@ protected:
   void final_integrate(double,int,PTYPE);
 
   void calculate_constraint_errors(int offset);
+  Eigen::Matrix<double, 3,Eigen::Dynamic> tmp_xs;
 
 private:
 
@@ -177,6 +170,10 @@ private:
   double dCdlambda_loweroff_val(int);
   double dCdlambda_upperoff_val(int);
 
+  Eigen::Matrix<double, 3,Eigen::Dynamic > tmp_bonds;
+
+
+  
 };
 };
 #endif

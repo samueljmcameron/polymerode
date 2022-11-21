@@ -11,7 +11,7 @@ public:
   NoTether(const std::vector<std::string> &);
 
   int single_step(double, double,
-		  const std::vector<std::vector<double>> &,
+		  const std::vector<Eigen::Vector3d> &,
 		  int itermax = 20, int numtries = 5,
 		  bool throw_exception=true) override ;
 

@@ -11,13 +11,13 @@ public:
   DoubleTether(const std::vector<std::string> &);
   
   int single_step(double , double ,
-		  const std::vector<std::vector<double>> & ,
+		  const std::vector<Eigen::Vector3d> & ,
 		  int itermax = 20,int numtries = 5,
 		  bool throw_exception = true) override;
  
 
   int single_step(double , double ,
-		  const std::vector<std::vector<double>> & ,
+		  const std::vector<Eigen::Vector3d> & ,
 		  std::function<Eigen::Vector3d (double)>,
 		  std::function<Eigen::Vector3d (double)>,
 		  std::function<Eigen::Vector3d (double)>,

@@ -13,7 +13,7 @@ namespace Initialise {
 /* -------------------------------------------------------------------------- */
 
 void init_atoms(const std::vector<std::string> & splitvec,
-		std::vector<Atom> &atoms_to_set,
+		Atom &atoms_to_set,
 		double springK,double dt, double tolerance,
 		int equilibration_steps)
 {
@@ -41,26 +41,15 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
   // and add derivative of potential
   
-  std::vector<std::vector<double>> dFdX_is;
+  std::vector<Eigen::Vector3d> dFdX_is;
 
   double t = 0;
 
 
 
-  dFdX_is.push_back(
-		    {springK*(pmer.atoms[0].R(0)-x0(0)),
-		     springK*(pmer.atoms[0].R(1)-x0(1)),
-		     springK*(pmer.atoms[0].R(2)-x0(2))}
-		    );
+  dFdX_is.push_back(springK*(pmer.atoms.xs.col(0)-x0));
   
-  dFdX_is.push_back(
-		    {springK*(pmer.atoms[b_index].R(0)-xN(0)),
-		     springK*(pmer.atoms[b_index].R(1)-xN(1)),
-		     springK*(pmer.atoms[b_index].R(2)-xN(2))}
-		    );
-
-
-
+  dFdX_is.push_back(springK*(pmer.atoms.xs.col(b_index)-xN));
 
   pmer.compute_tangents_and_friction();
   
@@ -73,17 +62,14 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
 
 
-  while ((pmer.atoms[b_index].R-xN).norm() > tolerance
-	 || (pmer.atoms[0].R-x0).norm() > tolerance || t < equilibration_steps*dt) {
+  while ((pmer.atoms.xs.col(b_index)-xN).norm() > tolerance
+	 || (pmer.atoms.xs.col(0)-x0).norm() > tolerance || t < equilibration_steps*dt) {
 
 
-    dFdX_is[0][0] = springK*(pmer.atoms[0].R(0)-x0(0));
-    dFdX_is[0][1] = springK*(pmer.atoms[0].R(1)-x0(1));
-    dFdX_is[0][2] = springK*(pmer.atoms[0].R(2)-x0(2));
+    dFdX_is[0] = springK*(pmer.atoms.xs.col(0)-x0);
 
-    dFdX_is[1][0] = springK*(pmer.atoms[b_index].R(0)-xN(0));
-    dFdX_is[1][1] = springK*(pmer.atoms[b_index].R(1)-xN(1));
-    dFdX_is[1][2] = springK*(pmer.atoms[b_index].R(2)-xN(2));
+    dFdX_is[1] = springK*(pmer.atoms.xs.col(b_index)-xN);
+
 
     pmer.single_step(t,dt,dFdX_is);
     t += dt;
@@ -91,7 +77,7 @@ void init_atoms(const std::vector<std::string> & splitvec,
   }
 
   for (int index = 0; index < pmer.get_Nbeads(); index ++ ) 
-    atoms_to_set.at(index).R = pmer.atoms[index].R;
+    atoms_to_set.xs.col(index) = pmer.atoms.xs.col(index);
   
   return ;
   
