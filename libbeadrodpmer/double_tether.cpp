@@ -291,7 +291,7 @@ void DoubleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1,
   rhs_of_Hhat({0,1,2}) = frictions[0]*(Fpots.col(0)+noises.col(0))
     - dXdt_at_1;
 
-  Polymer::set_rhs_of_Hhat(offset);
+  NoTether::set_rhs_of_Hhat(offset);
 
   int ind = Nbeads-1 + offset;
   rhs_of_Hhat({ind,ind+1,ind+2})

@@ -7,7 +7,7 @@
 #include <functional>
 
 namespace BeadRodPmer {
-class SingleTether : public Polymer {
+class SingleTether : public NoTether {
 public:
   // constructor
   SingleTether(const std::vector<std::string> &);
@@ -28,8 +28,6 @@ public:
 
 
   virtual void compute_noise() override;
-
-  void setup();
   
   void test_jacob(int,double,const Eigen::Vector3d &);  
 
@@ -62,9 +60,9 @@ private:
 
   void set_rhs_of_Hhat(const Eigen::Vector3d &) ;
 
-  void set_G();
-  void set_Hhat();
-  void set_dCdlambda();
+  virtual void set_G() override;
+  virtual void set_Hhat() override;
+  virtual void set_dCdlambda() override;
   
 };
 };

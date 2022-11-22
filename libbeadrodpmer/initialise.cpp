@@ -21,6 +21,8 @@ void init_atoms(const std::vector<std::string> & splitvec,
   
   BeadRodPmer::NoTether pmer(splitvec);
 
+  pmer.init_atoms_caret();
+  
   Eigen::Vector3d x0 = pmer.get_x0();
   Eigen::Vector3d xN = pmer.get_xN();
 

@@ -40,11 +40,10 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
   tDets.resize(Nbeads);
   bDets.resize(Nbeads);
 
+  tmp_bonds.resize(Eigen::NoChange,Nbeads-1);
+  tmp_xs.resize(Eigen::NoChange,Nbeads);
+
   
-
-  // set ^ configuration, with the bottoms of the ^ being x0 and xN
-  init_atoms_caret();
-
 }
 
 
@@ -120,6 +119,614 @@ int NoTether::single_step(double t, double dt,
 
 
 
+/* -------------------------------------------------------------------------- */
+/* Compute forces on the particles. */
+/* -------------------------------------------------------------------------- */
+void NoTether::compute_uc_forces()
+{
+
+  Fpots.col(0) = (end_inverses({0,1,2}).dot(bonds.col(0))*bonds.col(0)
+		   -1*k_effs(0)*(bonds.col(1)-costhetas(0)*bonds.col(0)));
+
+  Fpots.col(0) -= end_inverses({0,1,2});
+
+  Fpots.col(1) = (-end_inverses({0,1,2}).dot(bonds.col(0))*bonds.col(0)
+		   +k_effs(0)*(bonds.col(1)-costhetas(0)*bonds.col(0)
+			       - (bonds.col(0)-costhetas(0)*bonds.col(1)))
+		   - k_effs(1)*(bonds.col(2)-costhetas(1)*bonds.col(1)));
+
+
+  Fpots.col(1) += end_inverses({0,1,2});
+
+  			
+  for (int k = 2; k < Nbeads-2; k++) {
+
+    Fpots.col(k) = (k_effs(k-1)*(bonds.col(k)-costhetas(k-1)*bonds.col(k-1)
+				  -(bonds.col(k-1)-costhetas(k-1)*bonds.col(k)))
+		     -k_effs(k)*(bonds.col(k+1)-costhetas(k)*bonds.col(k))
+		     +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
+    
+  }
+
+  int k = Nbeads-2;
+  
+  Fpots.col(k) = (-end_inverses({3,4,5}).dot(bonds.col(k))*bonds.col(k)
+		   +k_effs(k-1)*(bonds.col(k)-costhetas(k-1)*bonds.col(k-1)
+				 -(bonds.col(k-1)-costhetas(k-1)*bonds.col(k)))
+		   +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
+  
+  Fpots.col(k) += end_inverses({3,4,5});
+
+  k = Nbeads-1;
+
+  Fpots.col(k) = (end_inverses({3,4,5}).dot(bonds.col(k-1))*bonds.col(k-1)
+		   +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
+
+
+  Fpots.col(k) -= end_inverses({3,4,5});
+
+  return;
+  
+}
+
+
+double NoTether::Hhat_diag_val(int mu)
+{
+
+
+  double tmp1 = tangents.col(mu).dot(bonds.col(mu));
+  tmp1 = tmp1*tmp1;
+
+
+  double tmp2 =  tangents.col(mu+1).dot(bonds.col(mu));
+  tmp2 = tmp2*tmp2;
+
+
+  return 2./zperp + (1./zpara-1./zperp)*(tmp1+tmp2);
+
+}
+
+
+
+double NoTether::dCdlambda_diag_val(int mu)
+{
+
+
+  double tmp1 = tangents.col(mu).dot(tmp_bonds.col(mu));
+  tmp1 = tmp1*tangents.col(mu).dot(bonds.col(mu));
+
+
+  double tmp2 =  tangents.col(mu+1).dot(tmp_bonds.col(mu));
+  tmp2 = tmp2*tangents.col(mu+1).dot(bonds.col(mu));
+
+  double tmp3 = tmp_bonds.col(mu).dot(bonds.col(mu));
+
+
+  return (2*tmp3/zperp + (1./zpara-1./zperp)*(tmp1+tmp2))/tmp_bonds.col(mu).norm();
+
+}
+
+
+/* NOte that there is a typo in the paper I'm basing this off of
+   (Montesi et al, 2005) , which is why there is a difference between
+   my off-diagonal H values and theirs. In their equation 34, anywhere
+   there is a mu+1, it should be a mu-1. */
+double NoTether::Hhat_loweroff_val(int mu)
+{
+
+  double tmp1 = bonds.col(mu-1).dot(bonds.col(mu));
+  double tmp2 = bonds.col(mu-1).dot(tangents.col(mu));
+  double tmp3 = tangents.col(mu).dot(bonds.col(mu));
+
+  return -1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3;
+
+}
+
+double NoTether::dCdlambda_loweroff_val(int mu)
+{
+
+  double tmp1 = bonds.col(mu-1).dot(tmp_bonds.col(mu));
+  double tmp2 = bonds.col(mu-1).dot(tangents.col(mu));
+  double tmp3 = tangents.col(mu).dot(tmp_bonds.col(mu));
+
+  return (-1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3)/tmp_bonds.col(mu).norm();
+
+}
+
+
+double NoTether::dCdlambda_upperoff_val(int mu)
+{
+
+  double tmp1 = bonds.col(mu).dot(tmp_bonds.col(mu-1));
+  double tmp2 = tmp_bonds.col(mu-1).dot(tangents.col(mu));
+  double tmp3 = tangents.col(mu).dot(bonds.col(mu));
+
+  return (-1./zperp*tmp1-(1./zpara-1./zperp)*tmp2*tmp3)/tmp_bonds.col(mu-1).norm();
+
+}
+
+
+
+double NoTether::Hhat_endblocks(int first, int second,int mu)
+{
+  double extra = 0;
+
+  if (first == second) extra = 1;
+  
+  return (extra/zperp + (1./zpara-1./zperp)*tangents(first,mu)
+	  *tangents(second,mu));
+
+}
+
+
+double NoTether::Hhat_leftside(int first)
+{
+
+  double tmp =  tangents.col(0).dot(bonds.col(0))*tangents(first,0);
+
+  
+  return -1*(1./zpara-1./zperp)*tmp - bonds(first,0)/zperp;
+
+}
+
+
+double NoTether::dCdlambda_leftside(int first)
+{
+
+  double tmp =  tangents.col(0).dot(tmp_bonds.col(0))*tangents(first,0);
+
+  
+  return (-1*(1./zpara-1./zperp)*tmp - tmp_bonds(first,0)/zperp)/tmp_bonds.col(0).norm();
+
+}
+
+
+
+double NoTether::Hhat_bottomside(int first)
+{
+  
+  double tmp =  tangents.col(Nbeads-1).dot(bonds.col(Nbeads-2))*tangents(first,Nbeads-1);
+  
+  
+  return (1./zpara-1./zperp)*tmp + bonds(first,Nbeads-2)/zperp;
+  
+}
+
+
+double NoTether::dCdlambda_bottomside(int first)
+{
+  
+  double tmp =  tangents.col(Nbeads-1).dot(tmp_bonds.col(Nbeads-2))
+    *tangents(first,Nbeads-1);
+  
+  
+  return ((1./zpara-1./zperp)*tmp + tmp_bonds(first,Nbeads-2)/zperp)
+    /tmp_bonds.col(Nbeads-2).norm();
+  
+}
+  
+  
+/* ---------------------------------------------------------------------------- */
+/* RHS of G*eta = P. To be used in derived classes. */
+/* ---------------------------------------------------------------------------- */
+void NoTether::set_rhs_of_G(int offset)
+{
+  
+  
+  
+  for (int i = 0; i < Nbeads-1; i++) {
+    rhs_of_G(i+offset) = bonds.col(i).dot(unprojected_noises.col(i+1)
+					  -unprojected_noises.col(i));
+    
+  }
+  
+  
+  return;
+  
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Helper function to initialise matrix G. */
+/* -------------------------------------------------------------------------- */
+void NoTether::init_G_coeffsmatrix(int offset,std::vector<T> &coeffs)
+{
+  // just set lower diagonal
+
+  coeffs.push_back(T(offset,offset,2));
+  
+  for (int i = 1; i < Nbeads-1; i++) {
+    coeffs.push_back(T(i+offset,i+offset,2));
+    coeffs.push_back(T(i+offset,i+offset-1,-costhetas(i-1)));
+
+  }
+  
+  return;
+
+  
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Update matrix G. Call at every time step aside from initial step. */
+/* -------------------------------------------------------------------------- */
+void NoTether::update_G(int offset)
+{
+  // update first column by hand
+
+
+
+  Gmunu.coeffRef(offset+1,offset) = -costhetas(0);
+
+
+  // update middle columns
+  for (int k = 1; k < Nbeads-2; k++) {
+
+
+    int count = 0;
+    for (SpMat::InnerIterator it(Gmunu,k+offset); it; ++it) {
+      if (count == 1) {
+	it.valueRef() = -costhetas(k);
+
+      }
+      count += 1;
+    }
+  }
+
+
+  return;
+}
+
+
+void NoTether::set_bdets_and_tdets(int offset)
+{
+
+  int mu;
+  for (int i = 0; i < Nbeads - 2; i++ ) {
+
+    mu = Nbeads-2-i;
+    bDets(mu-1+offset) = 2*bDets(mu+offset)
+      - costhetas(mu-1)*costhetas(mu-1)*bDets(mu+1+offset);
+
+    mu = i+2;
+
+    tDets(mu) = 2*tDets(mu-1)-costhetas(mu-2)*costhetas(mu-2)*tDets(mu-2);
+
+
+  }
+  
+}
+
+
+/* ---------------------------------------------------------------------------- */
+/* RHS of Hhat*lambda = Q. */
+/* ---------------------------------------------------------------------------- */
+void NoTether::set_rhs_of_Hhat(int offset)
+{
+
+  
+  
+  for (int i = 0; i< Nbeads-1; i++) {
+
+
+    rhs_of_Hhat(i+offset) = bonds.col(i).dot(frictions[i+1]*(Fpots.col(i+1)
+								  +noises.col(i+1))
+					     -frictions[i]*(Fpots.col(i)
+								 +noises.col(i)));
+    
+  }
+
+  return;
+  
+}
+
+/* -------------------------------------------------------------------------- */
+/* Helper function to initialise matrix H hat. */
+/* -------------------------------------------------------------------------- */
+void NoTether::init_Hhat_coeffsmatrix(int offset,std::vector<T> & coeffs)
+{
+
+
+
+  
+  coeffs.push_back(T(offset,offset,Hhat_diag_val(0)));
+  
+  
+  for (int i = 1; i < Nbeads-1; i++) {
+    coeffs.push_back(T(i+offset,i+offset,Hhat_diag_val(i)));
+    coeffs.push_back(T(i+offset,i+offset-1,Hhat_loweroff_val(i)));
+
+  }
+
+
+  return;
+
+  
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Update matrix M. Call at every time step aside from initial step. */
+/* -------------------------------------------------------------------------- */
+void NoTether::update_Hhat(int offset)
+{
+
+    
+  Hhat.coeffRef(offset,offset) = Hhat_diag_val(0);
+
+  Hhat.coeffRef(offset+1,offset) = Hhat_loweroff_val(1);
+
+  // update middle columns
+  for (int k = 1; k < Nbeads-2; k++) {
+
+    int count = 0;
+    for (SpMat::InnerIterator it(Hhat,k+offset); it; ++it) {
+      if (count == 0) {
+	it.valueRef() = Hhat_diag_val(k);
+
+      } else {
+	it.valueRef() = Hhat_loweroff_val(k+1);
+      }
+
+      count += 1;
+    }
+  }
+
+  Hhat.coeffRef(offset+Nbeads-2,offset+Nbeads-2) = Hhat_diag_val(Nbeads-2);
+  return;
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Helper function to initialise matrix dCdlambda. */
+/* -------------------------------------------------------------------------- */
+void NoTether::init_dCdlambda_coeffsmatrix(int offset,std::vector<T> &coeffs)
+{
+
+  // initializing the vector as the full (both upper and lower) part of Hhat, since
+  // this matrix won't be symmetric.
+
+  coeffs.push_back(T(offset,offset,Hhat_diag_val(0)));
+  
+  for (int i = 1; i < Nbeads-1; i++) {
+    coeffs.push_back(T(i-1+offset,i+offset,Hhat_loweroff_val(i)));
+    coeffs.push_back(T(i+offset,i+offset,Hhat_diag_val(i)));
+    coeffs.push_back(T(i+offset,i-1+offset,Hhat_loweroff_val(i)));
+
+
+  }
+
+  return ;
+
+}
+
+void NoTether::update_dCdlambda(double Delta_t,int offset)
+{
+
+
+
+  dCdlambda.coeffRef(offset,offset) = -dCdlambda_diag_val(0)*Delta_t;
+  dCdlambda.coeffRef(offset+1,offset)  = -dCdlambda_loweroff_val(1)*Delta_t;
+  
+
+  // update middle columns
+  for (int k = 1; k < Nbeads-2; k++) {
+
+
+    int count = 0;
+    for (SpMat::InnerIterator it(dCdlambda,k+offset); it; ++it) {
+
+      if (count == 0) {
+    	it.valueRef() = -dCdlambda_upperoff_val(k)*Delta_t;
+	
+      } else if (count == 1) {
+	
+	it.valueRef() = -dCdlambda_diag_val(k)*Delta_t;
+	
+      } else {
+
+	it.valueRef() = -dCdlambda_loweroff_val(k+1)*Delta_t;
+      }
+
+      count += 1;
+    }
+  }
+
+
+  // Nbeads - 1 col
+  dCdlambda.coeffRef(offset+Nbeads-3, offset+Nbeads-2) = - dCdlambda_upperoff_val(Nbeads-2)*Delta_t;			 
+  dCdlambda.coeffRef(offset+Nbeads-2, offset+Nbeads-2) = - dCdlambda_diag_val(Nbeads-2)*Delta_t;
+
+
+  return;
+
+}
+
+void NoTether::update_noise(int offset)
+{
+  int i = 0;
+  noises.col(i) = (unprojected_noises.col(i)
+			 + dummy_for_noise(i+offset)*bonds.col(i));
+  
+  
+  
+  for (i = 1; i < Nbeads-1; i++) {
+    noises.col(i) = (unprojected_noises.col(i)
+			   + dummy_for_noise(i+offset)*bonds.col(i)
+			   - dummy_for_noise(i+offset-1)*bonds.col(i-1));
+  }
+
+
+  i = Nbeads-1;
+
+  noises.col(i) = (unprojected_noises.col(i)
+			 - dummy_for_noise(i+offset-1)*bonds.col(i-1));
+  return;
+
+}
+
+
+
+
+
+void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
+{
+  
+  double tmp = Delta_t/2.0;
+
+  double tangentnorm;
+
+  
+  int i = 0;
+  tmp_xs.col(0) = xs.col(0);
+
+  t_forces.col(0) = tension(offset)*bonds.col(0);
+
+  if (cflag == SINGLE || cflag == DOUBLE) t_forces.col(0) -= tension({0,1,2});
+
+  xs.col(0) += tmp*frictions[0]*(Fpots.col(0)+noises.col(0)+t_forces.col(0));
+
+  i = 1;
+  tmp_xs.col(i) = xs.col(i);
+
+
+  t_forces.col(i) = tension(offset+i)*bonds.col(i)-tension(offset+i-1)*bonds.col(i-1);
+  
+  
+  xs.col(i) += tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+
+  bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
+  tmp_bonds.col(i-1) = bonds.col(i-1);
+  
+  tangentnorm = sqrt(bonds.col(i-1).dot(bonds.col(i-1)));
+  tangents.col(i-1) = bonds.col(i-1)/tangentnorm;
+
+
+  // compute friction with new values of R on bead i-1
+  single_inv_friction(i-1);
+  
+  for (i = 2; i < Nbeads-1; i++) {
+
+    tmp_xs.col(i) = xs.col(i);
+
+    t_forces.col(i) = tension(offset+i)*bonds.col(i)-tension(offset-1+i)*bonds.col(i-1);
+
+
+    xs.col(i) += tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+
+    bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
+    tmp_bonds.col(i-1) = bonds.col(i-1);
+
+    costhetas(i-2) = bonds.col(i-1).dot(bonds.col(i-2))
+      /(bonds.col(i-1).norm()*bonds.col(i-2).norm());
+
+
+    tangentnorm = sqrt((bonds.col(i-1)+bonds.col(i-2)
+			).dot(bonds.col(i-1)+bonds.col(i-2)));
+
+
+    tangents.col(i-1) = (bonds.col(i-1)+bonds.col(i-2))/tangentnorm;
+
+    single_inv_friction(i-1);
+
+  }
+
+
+  i = Nbeads -1;
+
+  tmp_xs.col(i) = xs.col(i);
+
+  t_forces.col(i) = -tension(offset-1+i)*bonds.col(i-1);
+
+  if (cflag == DOUBLE) {
+    int ind = offset+Nbeads-1;
+    t_forces.col(i) -= tension({ind,ind+1,ind+2});
+  }
+
+
+  xs.col(i) += tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+
+  bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
+  tmp_bonds.col(i-1) = bonds.col(i-1);
+
+
+  costhetas(i-2) = bonds.col(i-1).dot(bonds.col(i-2))
+    /(bonds.col(i-1).norm()*bonds.col(i-2).norm());
+
+  
+  tangentnorm = sqrt((bonds.col(i-1)+bonds.col(i-2)
+		      ).dot(bonds.col(i-1)+bonds.col(i-2)));
+  
+  
+  tangents.col(i-1) = (bonds.col(i-1)+bonds.col(i-2))/tangentnorm;
+  
+  single_inv_friction(i-1);
+  
+  tangentnorm = sqrt(bonds.col(i-1).dot(bonds.col(i-1)));
+  tangents.col(i) = bonds.col(i-1)/tangentnorm;
+
+  single_inv_friction(i);
+
+  return;
+}
+
+/*----------------------------------------------------------------------------*/
+/* Computes the final bead positions and unnormalised bond tangents. */
+/*----------------------------------------------------------------------------*/
+void NoTether::final_integrate(double Delta_t, int offset,PTYPE cflag)
+{
+  
+  double tmp = Delta_t;
+
+
+  t_forces.col(0)= tension(offset)*bonds.col(0);
+
+  if (cflag == SINGLE || cflag == DOUBLE) {
+    t_forces.col(0) -= tension({0,1,2});
+  }
+
+  xs.col(0) = tmp_xs.col(0) + tmp*frictions[0]*(Fpots.col(0)+noises.col(0)+t_forces.col(0));
+
+
+    
+  for (int i = 1; i < Nbeads-1; i++) {
+
+    t_forces.col(i) = tension(offset+i)*bonds.col(i)-tension(offset-1+i)*bonds.col(i-1);
+
+    xs.col(i) = tmp_xs.col(i) + tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+    tmp_bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
+    
+  }
+
+  int i = Nbeads -1;
+
+  t_forces.col(i) = -tension(offset-1+i)*bonds.col(i-1);
+
+  if (cflag == DOUBLE) {
+    int ind = offset+Nbeads-1;
+    t_forces.col(i) -= tension({ind,ind+1,ind+2});
+  }
+
+  xs.col(i) = tmp_xs.col(i) + tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+  tmp_bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
+
+  
+  return;
+}
+
+
+  
+  
+  
+void NoTether::calculate_constraint_errors(int offset)
+{
+  for (int mu = 1; mu < Nbeads; mu++) {
+    constraint_errors(mu-1+offset) = (xs.col(mu)-xs.col(mu-1)).norm()-bondlength;
+  }
+  
+  return;
+  
+}
 
 
 

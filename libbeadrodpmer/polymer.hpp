@@ -25,7 +25,6 @@ class Polymer {
 
   void compute_tangents_and_friction();
   void set_unprojected_noise(double);
-  void compute_uc_forces();
 
   void single_inv_friction(int);
 
@@ -66,7 +65,10 @@ class Polymer {
 
 
   Eigen::VectorXd constraint_errors;
-
+  
+  void init_atoms_rand();
+  void init_atoms_line();
+  void init_atoms_caret();
   
 protected:
   int Nbeads;           // number of polymer beads
@@ -77,26 +79,8 @@ protected:
   double kappa;         // bare bending energy
 
 
-
-  SpMat Gmunu;      // geometric tensor
-  Eigen::VectorXd rhs_of_G;  // rhs_of_G vector
-  Eigen::VectorXd dummy_for_noise;
-
-
-  SpMat Hhat;      // dynamical (hydrodynamic) tensor  
-  Eigen::VectorXd rhs_of_Hhat;  // rhs_of_H vector AND dC vector
-  Eigen::VectorXd tension;
-
-
-  
-  SpMat dCdlambda; // matrix for storing Jacobian of dC=0 Newton solver  
-  Eigen::VectorXd negative_tension_change;
-
-
-  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Gmunu_solver;
-  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Hhat_solver;
-
-  Eigen::SparseLU< SpMat > jacob_solver;
+  Eigen::VectorXd k_effs;
+  Eigen::VectorXd end_inverses;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
 
   
@@ -110,53 +94,6 @@ protected:
   std::mt19937 gen;
 
   std::uniform_real_distribution<double> dist;
-  
-
-
-  virtual void compute_noise() = 0;
-  virtual void compute_effective_kappa() = 0;
-  
-  double Hhat_endblocks(int,int,int);
-  double Hhat_leftside(int);
-  double dCdlambda_leftside(int);
-  double Hhat_bottomside(int);
-  double dCdlambda_bottomside(int);
-
-  void rescale_positions(bool);
-
-  Eigen::VectorXd tDets;
-  Eigen::VectorXd bDets;
-
-
-  Eigen::VectorXd k_effs;
-  Eigen::VectorXd end_inverses;
-
-  void set_rhs_of_G(int);
-
-  void set_rhs_of_Hhat(int);
-  void init_G_coeffsmatrix(int ,std::vector<T> &);
-  void update_G(int);
-  void update_Hhat(int);
-  void update_dCdlambda(double,int) ;
-  void init_Hhat_coeffsmatrix(int, std::vector<T>  &);
-
-  
-  void set_bdets_and_tdets(int);
-
-  
-  void init_dCdlambda_coeffsmatrix(int,std::vector<T> &);
-
-  void update_noise(int);
-
-  
-  
-  void initial_integrate(double,int,PTYPE);
-  void final_integrate(double,int,PTYPE);
-
-  void calculate_constraint_errors(int offset);
-  Eigen::Matrix3Xd tmp_xs;
-
-
 
 
 
@@ -170,9 +107,7 @@ protected:
   
   std::vector<Eigen::Matrix3d> frictions;
   
-  void init_atoms_rand();
-  void init_atoms_line();
-  void init_atoms_caret();
+
 
 private:
 
@@ -188,14 +123,6 @@ private:
   }
 
   
-  double Hhat_diag_val(int);
-  double Hhat_loweroff_val(int);
-  
-  double dCdlambda_diag_val(int);
-  double dCdlambda_loweroff_val(int);
-  double dCdlambda_upperoff_val(int);
-
-  Eigen::Matrix3Xd tmp_bonds;
 
 
   

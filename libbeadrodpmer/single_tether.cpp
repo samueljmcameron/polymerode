@@ -12,7 +12,7 @@ using namespace BeadRodPmer;
 /* Constructor */
 /* -------------------------------------------------------------------------- */
 SingleTether::SingleTether(const std::vector<std::string> & splitvec)
-  : Polymer(splitvec)
+  : NoTether(splitvec)
 {
 
   if (!flag_x0) 
@@ -173,12 +173,6 @@ int SingleTether::single_step(double t,double dt,
   return 0;
 }
 
-void SingleTether::setup() {
-  compute_tangents_and_friction();
-  set_G();
-  set_Hhat();
-  set_dCdlambda();
-}
 
 /* ---------------------------------------------------------------------------- */
 /* RHS of G*eta = P. */
@@ -189,7 +183,7 @@ void SingleTether::set_rhs_of_G()
 
   rhs_of_G({0,1,2}) = unprojected_noises.col(0);
 
-  Polymer::set_rhs_of_G(offset);
+  NoTether::set_rhs_of_G(offset);
   
   return;
   
@@ -235,7 +229,7 @@ std::vector<T> SingleTether::init_G_coeffsmatrix()
   coeffs.push_back(T(offset,offset-2,-btmp(1)));
   coeffs.push_back(T(offset,offset-1,-btmp(2)));
 
-  Polymer::init_G_coeffsmatrix(offset,coeffs);
+  NoTether::init_G_coeffsmatrix(offset,coeffs);
   
   return coeffs;
 
@@ -257,7 +251,7 @@ void SingleTether::update_G()
   Gmunu.coeffRef(offset,offset-2) = -bonds(1,0);
   Gmunu.coeffRef(offset,offset-1) = -bonds(2,0);
 
-  Polymer::update_G(offset);
+  NoTether::update_G(offset);
 
   return;
 }
@@ -273,7 +267,7 @@ void SingleTether::set_bdets_and_tdets()
   tDets(0) = 1.0;
   tDets(1) = 2 - bonds.col(0).squaredNorm();
 
-  Polymer::set_bdets_and_tdets(offset);
+  NoTether::set_bdets_and_tdets(offset);
   
   bDets(-1+offset) = bDets(offset)-bonds(2,0)*bonds(2,0)*bDets(1+offset);
   bDets(-2+offset) = bDets(-1+offset)-bonds(1,0)*bonds(1,0)*bDets(1+offset);
@@ -317,7 +311,7 @@ void SingleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1)
 
   rhs_of_Hhat({0,1,2}) = frictions[0]*(Fpots.col(0)+noises.col(0))-dXdt_at_1; 
   
-  Polymer::set_rhs_of_Hhat(offset);
+  NoTether::set_rhs_of_Hhat(offset);
   
   return;
   
@@ -371,7 +365,7 @@ std::vector<T> SingleTether::init_Hhat_coeffsmatrix()
   coeffs.push_back(T(offset,offset-1,Hhat_leftside(2)));
 
   
-  Polymer::init_Hhat_coeffsmatrix(offset,coeffs);
+  NoTether::init_Hhat_coeffsmatrix(offset,coeffs);
 
   return coeffs;
 
@@ -404,7 +398,7 @@ void SingleTether::update_Hhat()
   Hhat.coeffRef(offset,offset-2) = Hhat_leftside(1);
   Hhat.coeffRef(offset,offset-1) = Hhat_leftside(2);
 
-  Polymer::update_Hhat(offset);
+  NoTether::update_Hhat(offset);
 
   return;
 }
@@ -464,7 +458,7 @@ std::vector<T> SingleTether::init_dCdlambda_coeffsmatrix()
   coeffs.push_back(T(offset,offset-1,Hhat_leftside(2)));
 
   
-  Polymer::init_dCdlambda_coeffsmatrix(offset,coeffs);
+  NoTether::init_dCdlambda_coeffsmatrix(offset,coeffs);
 
   return coeffs;
 
@@ -512,7 +506,7 @@ void SingleTether::update_dCdlambda(double Delta_t)
   dCdlambda.coeffRef(offset-2,offset) = -Hhat_leftside(1)*Delta_t;
   dCdlambda.coeffRef(offset-1,offset) = -Hhat_leftside(2)*Delta_t;
 
-  Polymer::update_dCdlambda(Delta_t,offset);
+  NoTether::update_dCdlambda(Delta_t,offset);
   
 
   return;
@@ -530,7 +524,7 @@ void SingleTether::compute_noise()
 
   dummy_for_noise =  Gmunu_solver.solve(rhs_of_G);
 
-  Polymer::update_noise(offset);
+  NoTether::update_noise(offset);
 
   noises.col(0) -= dummy_for_noise({0,1,2});
 
@@ -655,7 +649,7 @@ void SingleTether::calculate_constraint_errors(const Eigen::Vector3d & X_of_t_at
   int offset = 3;
   constraint_errors({0,1,2}) = xs.col(0)-X_of_t_at_1;
 
-  Polymer::calculate_constraint_errors(offset);
+  NoTether::calculate_constraint_errors(offset);
 
   return;
 
