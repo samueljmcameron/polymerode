@@ -79,8 +79,6 @@ protected:
   double kappa;         // bare bending energy
 
 
-  Eigen::VectorXd k_effs;
-  Eigen::VectorXd end_inverses;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
 
   
@@ -106,7 +104,6 @@ protected:
   Eigen::Matrix3Xd bonds;
   
   std::vector<Eigen::Matrix3d> frictions;
-  
 
 
 private:

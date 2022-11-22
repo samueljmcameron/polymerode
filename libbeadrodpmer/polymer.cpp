@@ -130,9 +130,7 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
 
 
   costhetas.resize(Nbeads-2);
-  k_effs.resize(Nbeads-2);
-  end_inverses.resize(6);
-  end_inverses.setZero();
+
 
   gen.seed(seed);
 

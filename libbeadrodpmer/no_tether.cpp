@@ -43,7 +43,9 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
   tmp_bonds.resize(Eigen::NoChange,Nbeads-1);
   tmp_xs.resize(Eigen::NoChange,Nbeads);
 
-  
+  k_effs.resize(Nbeads-2);
+  end_inverses.resize(6);
+  end_inverses.setZero();  
 }
 
 

@@ -46,6 +46,11 @@ protected:
 
   Eigen::VectorXd tDets;
   Eigen::VectorXd bDets;
+
+
+  Eigen::VectorXd k_effs;
+  Eigen::VectorXd end_inverses;
+
   
   int correct_tension(double,int itermax = 20,double tol = 1e-14) ;
 
