@@ -1,12 +1,10 @@
 #include "no_tether.hpp"
 #include "input.hpp"
-#include "initialise.hpp"
 
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
 
-#define SMALL 1e-14
 
 namespace BeadRodPmer {
 
@@ -23,7 +21,6 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
   Gmunu.resize(Nbeads-1,Nbeads-1);
 
 
-  
 
   rhs_of_Hhat.resize(Nbeads-1);
   tension.resize(Nbeads-1);
@@ -52,7 +49,12 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
 
 
 
-
+void NoTether::setup() {
+  compute_tangents_and_friction();
+  set_G();
+  set_Hhat();
+  set_dCdlambda();
+}
 
 int NoTether::single_step(double t, double dt,
 			  const std::vector<Eigen::Vector3d> & dFdX_i,
@@ -102,7 +104,7 @@ int NoTether::single_step(double t, double dt,
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
     for (int i = 0; i < get_Nbeads(); i++) 
-      atoms.xs.col(i) = tmp_xs.col(i);
+      xs.col(i) = tmp_xs.col(i);
 
     compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
@@ -334,228 +336,5 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
   return count;
   
 }
-
-  
-  
-  
-  
-  
-  namespace gramschmidt {
-void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
-		 Eigen::Vector3d& ez)
-{
-  
-  
-  
-  if (std::abs(std::abs(ey.dot(ez))-std::abs(ey.dot(ey))) < SMALL) {
-    ey(0) += 0.1;
-    ey(1) += -0.2;
-    ey(3) += 0.3;
-    ey = ey/sqrt(ey.dot(ey));
-  }
-  
-  if (std::abs(std::abs(x1.dot(ey))-std::abs(x1.dot(x1))) < SMALL) {
-    ey(0) += 0.1;
-    ey(1) += -0.2;
-    ey(3) += 0.3;
-    ey = ey/sqrt(ey.dot(ey));
-  } else if (std::abs(std::abs(x1.dot(ez))-std::abs(x1.dot(x1))) < SMALL) {
-    ez(0) += -0.3;
-    ez(1) += 0.12;
-    ez(3) += -0.5;
-    ez = ez/sqrt(ez.dot(ez));
-  }
-  
-  // Proceed to orthonormalise
-  
-  ey = ey - ey.dot(x1)*x1;
-  ey = ey/sqrt(ey.dot(ey));
-  
-  ez = ez - ez.dot(ey)*ey - ez.dot(x1)*x1;
-  ez = ez/sqrt(ez.dot(ez));
-  
-  return;
-  
-}
-
-  
-}
-
-  
-
-/* -------------------------------------------------------------------------- */
-/* Call to set random configuration. */
-/* -------------------------------------------------------------------------- */
-void NoTether::init_atoms_rand()
-{
-
-  Eigen::Vector3d u(1,0,0);
-  Eigen::Vector3d v(0,1,0);
-  Eigen::Vector3d w(0,0,1);
-
-  Eigen::Vector3d diffbasis(0,0,0);
-  
-  double tmp,swich;
-  double dum;
-
-  for (int mu = 0; mu < Nbeads-1; mu++) {
-
-    if (mu > 0) {
-      gramschmidt::gramschmidt(u,v,w); // redundant in first iteration
-    }
-
-    diffbasis(0) = 2*dist(gen);
-    
-    tmp = 1-diffbasis(0)*diffbasis(0);
-    if (tmp > SMALL) {
-      dum = dist(gen);
-      diffbasis(1) = 2*dum*sqrt(tmp);
-
-      swich = dist(gen);
-      
-      dum = tmp - diffbasis(1)*diffbasis(1);
-
-
-      
-      if (swich > 0) {
-	
-	diffbasis(2) = sqrt(tmp - diffbasis(1)*diffbasis(1));
-      } else {
-	diffbasis(2) = -1*sqrt(tmp - diffbasis(1)*diffbasis(1));
-      }
-      
-      
-    } else {
-      diffbasis(1) = diffbasis(2) = 0;
-    }
-    
-    atoms.bonds(0,mu) = diffbasis(0)*u(0) + diffbasis(1)*v(0) + diffbasis(2)*w(0);
-    atoms.bonds(1,mu) = diffbasis(0)*u(1) + diffbasis(1)*v(1) + diffbasis(2)*w(1);
-    atoms.bonds(2,mu) = diffbasis(0)*u(2) + diffbasis(1)*v(2) + diffbasis(2)*w(2);
-    
-    u = atoms.bonds.col(mu);
-
-  
-  }
-
-  atoms.xs.col(0) = x0;
-;
-
-
-  for (int mu = 0; mu< Nbeads-1; mu++) {
-    atoms.xs.col(mu+1) = atoms.xs.col(mu) + bondlength*atoms.bonds.col(mu);
-  }
-
-  // shift so that centre of mass is halfway between the two end points specified
-
-  Eigen::Vector3d com = {0,0,0};
-
-  for (int i = 0; i < Nbeads; i++) {
-    com += atoms.xs.col(i);
-  }
-
-  com /= Nbeads;
-
-  for (int i = 0; i < Nbeads; i++) {
-    atoms.xs.col(i) = atoms.xs.col(i) + (x0 + xN)/2 - com;
-  }  
-    
-  return;
-
-}
-
-/* -------------------------------------------------------------------------- */
-/* Call to set line configuration so that polymer intersects initial points
-   x0 and xN with same centre of mass as the initial points. */
-/* -------------------------------------------------------------------------- */
-void NoTether::init_atoms_line()
-{
-
-  double length_init = (xN-x0).norm();
-  
-  double t1 = 0.5*(1-(Nbeads-1)*bondlength/length_init);
-  for (int i = 0; i < Nbeads; i++) 
-    atoms.xs.col(i) = x0 + (xN-x0)*(t1+i*bondlength/length_init);
-    
-  return;
-
-}
-
-void NoTether::init_atoms_caret()
-{
-
-
-  
-  Eigen::Vector3d nhat;
-
-  nhat(0) = 2*dist(gen);
-  nhat(1) = 2*dist(gen);
-  nhat(2) = 2*dist(gen);
-  
-  Eigen::Vector3d dd = xN-x0;
-
-  if (dd.norm() > bondlength*(Nbeads-1)) {
-    throw std::runtime_error("|x0-xN| is longer than the polymer.");
-  }
-
-
-  if (dd.norm() < SMALL) {
-    throw std::runtime_error("|x0-xN| is longer than the polymer.");
-  }
-
-  if (std::abs(dd(2)) < SMALL) {
-    if (std::abs(dd(1)) < SMALL) {
-      nhat(0) = 0;
-      // loop here is to ensure that not all components of normal vector are zero
-      while (std::abs(nhat(1)) < SMALL) {
-	nhat(1) = 2*dist(gen);
-      }
-    } else {
-      nhat(1) = -nhat(0)*dd(0)/dd(1);
-    }
-  } else {
-    nhat(2) = -(nhat(1)*dd(1) + nhat(0)*dd(0))/dd(2);
-  }
-
-  nhat = nhat/nhat.norm();
-
-
-  double fakelength;
-
-
-  // since the parameterisation only works for an odd number of beads, we overshoot
-  // the point x0 for an even number of beads by pretending the system only has
-  // Nbeads-1 beads, so the final bead gets put past the point x0
-  if (Nbeads % 2 == 0) {
-    fakelength = (Nbeads-2)*bondlength;
-  } else {
-    fakelength = (Nbeads-1)*bondlength;
-  }
-  
-
-  double gamma = 0.5*sqrt(fakelength*fakelength-dd.squaredNorm());
-
-  Eigen::Vector3d alpha = 0.5*dd+gamma*nhat;
-  Eigen::Vector3d beta = -0.5*dd+gamma*nhat;
-
-
-  double tp = 0;
-  double dtp = 1.0*bondlength/fakelength;
-
-  
-  for (int i = 0; i < Nbeads; i++) {
-    
-    tp = i*dtp;
-
-    // integer division rounds toward zero
-    if (i < Nbeads/2) {
-      atoms.xs.col(i) = x0 + 2*alpha*tp;
-    } else {
-      atoms.xs.col(i) = xN + 2*beta*(1-tp);
-    }
-  }
-  return;
-
-}
-
+ 
 }

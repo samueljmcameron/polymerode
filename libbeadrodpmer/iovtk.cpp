@@ -46,8 +46,8 @@ void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
 	 << std::endl;
 
   for (int i = 0; i < pmer.get_Nbeads(); i++) {
-    myfile << pmer.atoms.xs.col(i)(0) << " " << pmer.atoms.xs.col(i)(1) << " "
-	   << pmer.atoms.xs.col(i)(2) << " ";
+    myfile << pmer.xs.col(i)(0) << " " << pmer.xs.col(i)(1) << " "
+	   << pmer.xs.col(i)(2) << " ";
     
   }
   myfile << std::endl << "</DataArray>" << std::endl
@@ -213,9 +213,9 @@ void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
   std::stringstream ss(stopline);
   
   for (int i = 0; i < pmer.get_Nbeads(); i++) {
-    ss >> pmer.atoms.xs.col(i)(0);
-    ss >> pmer.atoms.xs.col(i)(1);
-    ss >> pmer.atoms.xs.col(i)(2);
+    ss >> pmer.xs.col(i)(0);
+    ss >> pmer.xs.col(i)(1);
+    ss >> pmer.xs.col(i)(2);
   }
 
   myfile.close();

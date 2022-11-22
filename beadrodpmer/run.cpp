@@ -63,7 +63,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   double t = 0;
 
-  movingEnds move(0.1,100,pmer.atoms.xs.col(0),pmer.atoms.xs.col(pmer.get_Nbeads()-1));
+  movingEnds move(0.1,100,pmer.xs.col(0),pmer.xs.col(pmer.get_Nbeads()-1));
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
   auto XN_t = std::bind(&movingEnds::XN_t,&move,std::placeholders::_1);
@@ -89,12 +89,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
-  pmer.compute_tangents_and_friction();
-  
-  pmer.set_Hhat();
-  pmer.set_dCdlambda();
-  pmer.set_G();
-  
+  pmer.setup();  
   pmer.single_step(t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
   t += dt;
 
@@ -151,7 +146,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   // since only fixing one end, the XN argument of the move class is ignored
   // so putting in the zero vector {0,0,0} as a placeholder
-  movingEnds move(0.1,100,pmer.atoms.xs.col(0),{0,0,0});
+  movingEnds move(0.1,100,pmer.xs.col(0),{0,0,0});
 
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
@@ -175,11 +170,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
-  pmer.compute_tangents_and_friction();
-  
-  pmer.set_Hhat();
-  pmer.set_dCdlambda();
-  pmer.set_G();
+  pmer.setup();
   pmer.single_step(t,dt,dFdX_is,X0_t,dX0dt);
   t += dt;
 
@@ -250,11 +241,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
-  pmer.compute_tangents_and_friction();
-  
-  pmer.set_Hhat();
-  pmer.set_dCdlambda();
-  pmer.set_G();
+  pmer.setup();
   pmer.single_step(t,dt,dFdX_is);
   t += dt;
 

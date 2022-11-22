@@ -10,17 +10,14 @@ public:
   // constructor
   NoTether(const std::vector<std::string> &);
 
-  int single_step(double, double,
-		  const std::vector<Eigen::Vector3d> &,
-		  int itermax = 20, int numtries = 5,
-		  bool throw_exception=true) override ;
+  virtual int single_step(double, double,
+			  const std::vector<Eigen::Vector3d> &,
+			  int itermax = 20, int numtries = 5,
+			  bool throw_exception=true) override ;
 
-    
-  void set_G() override ;
-  
-  void set_Hhat() override;
 
-  void set_dCdlambda() override;
+  virtual void setup() override;
+
   
   void test_jacob(int,double) ;
 
@@ -31,17 +28,16 @@ public:
 
 
 
-  void compute_noise() override;
+  virtual void compute_noise() override;
   void compute_tension() ;
 
-  void compute_effective_kappa() override;
+  virtual void compute_effective_kappa() override;
 
 private:
   
-
-  void init_atoms_rand();
-  void init_atoms_line();
-  void init_atoms_caret();
+  virtual void set_G();
+  virtual void set_Hhat();
+  virtual void set_dCdlambda();
 
 
   

@@ -12,7 +12,7 @@ using namespace BeadRodPmer;
 /* Constructor */
 /* -------------------------------------------------------------------------- */
 DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
-  : Polymer(splitvec)
+  : SingleTether(splitvec)
 {
   
   rhs_of_G.resize(Nbeads+5);
@@ -82,8 +82,8 @@ int DoubleTether::single_step(double t, double dt,
   
   compute_tension({0,0,0},{0,0,0});
   
-  int iterations = correct_tension(dt,atoms.xs.col(0),
-				   atoms.xs.col(Nbeads-1),
+  int iterations = correct_tension(dt,xs.col(0),
+				   xs.col(Nbeads-1),
 				   itermax,1e-8);
 
 
@@ -95,7 +95,7 @@ int DoubleTether::single_step(double t, double dt,
 	      << " attempts left). " << std::endl;
 
     for (int i = 0; i < get_Nbeads(); i++) 
-      atoms.xs.col(i) = tmp_xs.col(i);
+      xs.col(i) = tmp_xs.col(i);
 
     compute_tangents_and_friction();
     
@@ -167,7 +167,7 @@ int DoubleTether::single_step(double t,double dt,
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
     for (int i = 0; i < get_Nbeads(); i++) 
-      atoms.xs.col(i) = tmp_xs.col(i);
+      xs.col(i) = tmp_xs.col(i);
 
     compute_tangents_and_friction();
     return single_step(t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
@@ -186,37 +186,20 @@ int DoubleTether::single_step(double t,double dt,
 /* ---------------------------------------------------------------------------- */
 void DoubleTether::set_rhs_of_G()
 {
+
   int offset = 3;
-
-  rhs_of_G({0,1,2}) = atoms.unprojected_noises.col(0);
-
   
-  Polymer::set_rhs_of_G(offset);
+  SingleTether::set_rhs_of_G();
 
   int ind = Nbeads-1+offset;
   
-  rhs_of_G({ind,ind+1,ind+2}) = atoms.unprojected_noises.col(Nbeads-1);
+  rhs_of_G({ind,ind+1,ind+2}) = unprojected_noises.col(Nbeads-1);
   
   return;
   
 }
 
 
-/* -------------------------------------------------------------------------- */
-/* Initialse G in G*eta = P (only call once). */
-/* -------------------------------------------------------------------------- */
-void DoubleTether::set_G()
-{
-
-  std::vector<T> coefficients = init_G_coeffsmatrix();
-
-  Gmunu.setFromTriplets(coefficients.begin(),coefficients.end());
-
-  Gmunu_solver.analyzePattern(Gmunu);
-
-  return;
-
-}
 
 
 /* -------------------------------------------------------------------------- */
@@ -228,22 +211,10 @@ std::vector<T> DoubleTether::init_G_coeffsmatrix()
   int offset = 3;
   std::vector<T> coeffs;
 
-  
-  coeffs.push_back(T(offset-3,offset-3,1));
-  coeffs.push_back(T(offset-2,offset-2,1));
-  coeffs.push_back(T(offset-1,offset-1,1));
+  coeffs = SingleTether::init_G_coeffsmatrix();
 
 
-  Eigen::Vector3d btmp = atoms.bonds.col(0);
-  
-  coeffs.push_back(T(offset,offset-3,-btmp(0)));
-  coeffs.push_back(T(offset,offset-2,-btmp(1)));
-  coeffs.push_back(T(offset,offset-1,-btmp(2)));
-
-  Polymer::init_G_coeffsmatrix(offset,coeffs);
-
-
-  btmp = atoms.bonds.col(Nbeads-2);
+  Eigen::Vector3d btmp = bonds.col(Nbeads-2);
 
   coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads-2,btmp(0)));
   coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads-1,1));
@@ -266,15 +237,11 @@ void DoubleTether::update_G()
 
   int offset = 3;
 
-  Gmunu.coeffRef(offset,offset-3) = -atoms.bonds(0,0);
-  Gmunu.coeffRef(offset,offset-2) = -atoms.bonds(1,0);
-  Gmunu.coeffRef(offset,offset-1) = -atoms.bonds(2,0);
-
-  Polymer::update_G(offset);
+  SingleTether::update_G();
   
-  Gmunu.coeffRef(offset+Nbeads-1,offset+Nbeads-2) = atoms.bonds(0,Nbeads-2);
-  Gmunu.coeffRef(offset+Nbeads,offset+Nbeads-2) = atoms.bonds(1,Nbeads-2);
-  Gmunu.coeffRef(offset+Nbeads+1,offset+Nbeads-2) = atoms.bonds(2,Nbeads-2);
+  Gmunu.coeffRef(offset+Nbeads-1,offset+Nbeads-2) = bonds(0,Nbeads-2);
+  Gmunu.coeffRef(offset+Nbeads,offset+Nbeads-2) = bonds(1,Nbeads-2);
+  Gmunu.coeffRef(offset+Nbeads+1,offset+Nbeads-2) = bonds(2,Nbeads-2);
   
   return;
 }
@@ -285,35 +252,24 @@ void DoubleTether::compute_effective_kappa()
   int offset = 3;
 
 
-  bDets(Nbeads-1+offset) = 1.0;
-  bDets(Nbeads-2+offset) = 2 - atoms.bonds.col(Nbeads-2).squaredNorm();
-  tDets(0) = 1.0;
-  tDets(1) = 2 - atoms.bonds.col(0).squaredNorm();
+  set_bdets_and_tdets();
 
-  set_bdets_and_tdets(offset);
   
-  bDets(-1+offset) = bDets(offset)-atoms.bonds(2,0)*atoms.bonds(2,0)*bDets(1+offset);
-  bDets(-2+offset) = bDets(-1+offset)-atoms.bonds(1,0)*atoms.bonds(1,0)*bDets(1+offset);
-  bDets(-3+offset) = bDets(-2+offset)-atoms.bonds(0,0)*atoms.bonds(0,0)*bDets(1+offset);
-
-  tDets(Nbeads) = tDets(Nbeads-1) - atoms.bonds(0,Nbeads-2)*atoms.bonds(0,Nbeads-2)*tDets(Nbeads-2);
-  tDets(Nbeads+1) = tDets(Nbeads) - atoms.bonds(1,Nbeads-2)*atoms.bonds(1,Nbeads-2)*tDets(Nbeads-2);
-  tDets(Nbeads+2) = tDets(Nbeads+1) - atoms.bonds(2,Nbeads-2)*atoms.bonds(2,Nbeads-2)*tDets(Nbeads-2);
+  tDets(Nbeads) = tDets(Nbeads-1) - bonds(0,Nbeads-2)*bonds(0,Nbeads-2)*tDets(Nbeads-2);
+  tDets(Nbeads+1) = tDets(Nbeads) - bonds(1,Nbeads-2)*bonds(1,Nbeads-2)*tDets(Nbeads-2);
+  tDets(Nbeads+2) = tDets(Nbeads+1) - bonds(2,Nbeads-2)*bonds(2,Nbeads-2)*tDets(Nbeads-2);
 
   double gDet = tDets(Nbeads+2);
-  end_inverses({0,1,2}) = atoms.bonds.col(0)*bDets(1+offset)/(gDet*bondlength);
+  end_inverses({0,1,2}) = bonds.col(0)*bDets(1+offset)/(gDet*bondlength);
 
 
-  end_inverses({3,4,5}) = -atoms.bonds.col(Nbeads-2)*tDets(Nbeads-2)/(gDet*bondlength);
+  end_inverses({3,4,5}) = -bonds.col(Nbeads-2)*tDets(Nbeads-2)/(gDet*bondlength);
 
   for (int i = 0; i < Nbeads-2; i++) {
     k_effs(i) = (kappa - temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2+offset)/gDet
 		 )/(bondlength*bondlength);
   }
 
-
-  
-  
   return;
 
 }
@@ -332,43 +288,19 @@ void DoubleTether::set_rhs_of_Hhat(const Eigen::Vector3d &dXdt_at_1,
   
   
 
-  rhs_of_Hhat({0,1,2}) = atoms.frictions[0]*(atoms.Fpots.col(0)+atoms.noises.col(0))
+  rhs_of_Hhat({0,1,2}) = frictions[0]*(Fpots.col(0)+noises.col(0))
     - dXdt_at_1;
 
   Polymer::set_rhs_of_Hhat(offset);
 
-
-
   int ind = Nbeads-1 + offset;
   rhs_of_Hhat({ind,ind+1,ind+2})
-    = atoms.frictions[Nbeads-1]*(atoms.Fpots.col(Nbeads-1)+atoms.noises.col(Nbeads-1))
+    = frictions[Nbeads-1]*(Fpots.col(Nbeads-1)+noises.col(Nbeads-1))
     - dXdt_at_N;
 
   
   return;
   
-}
-
-
-
-
-
-
-/* -------------------------------------------------------------------------- */
-/* Initialise matrix H hat. */
-/* -------------------------------------------------------------------------- */
-void DoubleTether::set_Hhat()
-{
-
-  std::vector<T> coefficients = init_Hhat_coeffsmatrix();
-
-  Hhat.setFromTriplets(coefficients.begin(),coefficients.end());
-
-
-  Hhat_solver.analyzePattern(Hhat);
-
-  return;
-
 }
 
 
@@ -382,22 +314,8 @@ std::vector<T> DoubleTether::init_Hhat_coeffsmatrix()
   std::vector<T> coeffs;
 
   int offset = 3;
-
-  coeffs.push_back(T(offset-3,offset-3,Hhat_endblocks(0,0,0)));
-  coeffs.push_back(T(offset-2,offset-3,Hhat_endblocks(1,0,0)));
-  coeffs.push_back(T(offset-2,offset-2,Hhat_endblocks(1,1,0)));
-  coeffs.push_back(T(offset-1,offset-3,Hhat_endblocks(2,0,0)));
-  coeffs.push_back(T(offset-1,offset-2,Hhat_endblocks(2,1,0)));
-  coeffs.push_back(T(offset-1,offset-1,Hhat_endblocks(2,2,0)));
-
-
   
-  coeffs.push_back(T(offset,offset-3,Hhat_leftside(0)));
-  coeffs.push_back(T(offset,offset-2,Hhat_leftside(1)));
-  coeffs.push_back(T(offset,offset-1,Hhat_leftside(2)));
-
-  
-  Polymer::init_Hhat_coeffsmatrix(offset,coeffs);
+  coeffs = SingleTether::init_Hhat_coeffsmatrix();
 
   
   coeffs.push_back(T(offset+Nbeads-1,offset+Nbeads-2,Hhat_bottomside(0)));
@@ -431,21 +349,9 @@ void DoubleTether::update_Hhat()
 {
 
   int offset = 3;
-  // update first four columns by hand
-
-  Hhat.coeffRef(offset-3,offset-3) = Hhat_endblocks(0,0,0);
-  Hhat.coeffRef(offset-2,offset-3) = Hhat_endblocks(1,0,0);
-  Hhat.coeffRef(offset-2,offset-2) = Hhat_endblocks(1,1,0);
-  Hhat.coeffRef(offset-1,offset-3) = Hhat_endblocks(2,0,0);
-  Hhat.coeffRef(offset-1,offset-2) = Hhat_endblocks(2,1,0);
-  Hhat.coeffRef(offset-1,offset-1) = Hhat_endblocks(2,2,0);
 
 
-  Hhat.coeffRef(offset,offset-3) = Hhat_leftside(0);
-  Hhat.coeffRef(offset,offset-2) = Hhat_leftside(1);
-  Hhat.coeffRef(offset,offset-1) = Hhat_leftside(2);
-    
-  Polymer::update_Hhat(offset);
+  SingleTether::update_Hhat();
   
   Hhat.coeffRef(offset+Nbeads-1,offset+Nbeads-2) = Hhat_bottomside(0);
   Hhat.coeffRef(offset+Nbeads,offset+Nbeads-2) = Hhat_bottomside(1);
@@ -464,26 +370,6 @@ void DoubleTether::update_Hhat()
 }
 
 
-
-
-/* -------------------------------------------------------------------------- */
-/* Initialise the dCdlambda matrix. */
-/* -------------------------------------------------------------------------- */
-void DoubleTether::set_dCdlambda()
-{
-
-  std::vector<T> coefficients = init_dCdlambda_coeffsmatrix();
-
-  dCdlambda.setFromTriplets(coefficients.begin(),coefficients.end());
-
-  jacob_solver.analyzePattern(dCdlambda);
-
-  return;
-
-}
-
-
-
 /* -------------------------------------------------------------------------- */
 /* Helper function to initialise matrix dCdlambda. */
 /* -------------------------------------------------------------------------- */
@@ -496,28 +382,7 @@ std::vector<T> DoubleTether::init_dCdlambda_coeffsmatrix()
 
   int offset = 3;
 
-  coeffs.push_back(T(offset-3,offset-3,Hhat_endblocks(0,0,0)));
-  coeffs.push_back(T(offset-3,offset-2,Hhat_endblocks(1,0,0)));
-  coeffs.push_back(T(offset-3,offset-1,Hhat_endblocks(2,0,0)));
-  coeffs.push_back(T(offset-3,offset,Hhat_leftside(0)));
-  
-  
-  coeffs.push_back(T(offset-2,offset-3,Hhat_endblocks(1,0,0)));
-  coeffs.push_back(T(offset-2,offset-2,Hhat_endblocks(1,1,0)));
-  coeffs.push_back(T(offset-2,offset-1,Hhat_endblocks(2,1,0)));
-  coeffs.push_back(T(offset-2,offset,Hhat_leftside(1)));
-  
-  coeffs.push_back(T(offset-1,offset-3,Hhat_endblocks(2,0,0)));
-  coeffs.push_back(T(offset-1,offset-2,Hhat_endblocks(2,1,0)));
-  coeffs.push_back(T(offset-1,offset-1,Hhat_endblocks(2,2,0)));
-  coeffs.push_back(T(offset-1,offset,Hhat_leftside(2)));
-
-  
-  coeffs.push_back(T(offset,offset-3,Hhat_leftside(0)));
-  coeffs.push_back(T(offset,offset-2,Hhat_leftside(1)));
-  coeffs.push_back(T(offset,offset-1,Hhat_leftside(2)));
-
-  Polymer::init_dCdlambda_coeffsmatrix(offset,coeffs);
+  coeffs = SingleTether::init_dCdlambda_coeffsmatrix();
   
   coeffs.push_back(T(offset+Nbeads-2,offset+Nbeads-1,Hhat_bottomside(0)));
   coeffs.push_back(T(offset+Nbeads-2,offset+Nbeads,Hhat_bottomside(1)));
@@ -556,38 +421,7 @@ void DoubleTether::update_dCdlambda(double Delta_t)
   int offset = 3;
 
 
-  // negative two col
-  dCdlambda.coeffRef(offset-3,offset-3) = -Hhat_endblocks(0,0,0)*Delta_t;
-  dCdlambda.coeffRef(offset-2,offset-3) = -Hhat_endblocks(1,0,0)*Delta_t;
-  dCdlambda.coeffRef(offset-1,offset-3) = -Hhat_endblocks(2,0,0)*Delta_t;
-
-  
-  dCdlambda.coeffRef(offset,offset-3) = -dCdlambda_leftside(0)*Delta_t;
-
-
-  // n one col
-  dCdlambda.coeffRef(offset-3,offset-2) = -Hhat_endblocks(1,0,0)*Delta_t;
-  dCdlambda.coeffRef(offset-2,offset-2) = -Hhat_endblocks(1,1,0)*Delta_t;
-  dCdlambda.coeffRef(offset-1,offset-2) = -Hhat_endblocks(2,1,0)*Delta_t;
-  dCdlambda.coeffRef(offset,offset-2) = -dCdlambda_leftside(1)*Delta_t;
-
-
-  
-  // zero col
-  dCdlambda.coeffRef(offset-3,offset-1) = -Hhat_endblocks(2,0,0)*Delta_t;
-  dCdlambda.coeffRef(offset-2,offset-1) = -Hhat_endblocks(2,1,0)*Delta_t;
-  dCdlambda.coeffRef(offset-1,offset-1) = -Hhat_endblocks(2,2,0)*Delta_t;
-  dCdlambda.coeffRef(offset,offset-1) = -dCdlambda_leftside(2)*Delta_t;
-
-
-
-  // one col
-  dCdlambda.coeffRef(offset-3,offset) = -Hhat_leftside(0)*Delta_t;
-  dCdlambda.coeffRef(offset-2,offset) = -Hhat_leftside(1)*Delta_t;
-  dCdlambda.coeffRef(offset-1,offset) = -Hhat_leftside(2)*Delta_t;
-  
-
-  Polymer::update_dCdlambda(Delta_t,offset);
+  SingleTether::update_dCdlambda(Delta_t);
 
   // Nbeads - 1 col
 
@@ -629,19 +463,11 @@ void DoubleTether::compute_noise()
 {
 
   int offset = 3;
-  set_rhs_of_G();
-  Gmunu_solver.factorize(Gmunu);
 
-  dummy_for_noise =  Gmunu_solver.solve(rhs_of_G);
-
-
-  update_noise(offset);
-  
-  atoms.noises.col(0) -= dummy_for_noise({-3,-2,-1});
-
+  SingleTether::compute_noise();
 
   int ind = offset + Nbeads-1;
-  atoms.noises.col(Nbeads-1) -= dummy_for_noise({ind,ind+1,ind+2});
+  noises.col(Nbeads-1) -= dummy_for_noise({ind,ind+1,ind+2});
 
   return;
   
@@ -767,12 +593,11 @@ void DoubleTether::calculate_constraint_errors(const Eigen::Vector3d & X_of_t_at
 					       const Eigen::Vector3d & X_of_t_at_N)
 {
   int offset = 3;
-  constraint_errors({0,1,2}) = atoms.xs.col(0)-X_of_t_at_1;
 
-  Polymer::calculate_constraint_errors(offset);
+  SingleTether::calculate_constraint_errors(X_of_t_at_1);
 
   int ind = offset+Nbeads-1;
-  constraint_errors({ind,ind+1,ind+2}) = atoms.xs.col(Nbeads-1)-X_of_t_at_N;
+  constraint_errors({ind,ind+1,ind+2}) = xs.col(Nbeads-1)-X_of_t_at_N;
   
   return;
 

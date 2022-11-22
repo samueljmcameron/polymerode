@@ -2,8 +2,6 @@
 #ifndef BEADRODPMER_POLYMER_HPP
 #define BEADRODPMER_POLYMER_HPP
 
-#include "atom.hpp"
-
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
@@ -43,13 +41,42 @@ class Polymer {
   Eigen::Vector3d get_x0() const;
   Eigen::Vector3d get_xN() const;
 
-  Atom atoms;
-
-  
   std::vector<int> nuc_beads;
   std::vector<double> nuc_strengths;
   std::vector<double> nuc_maxs;
   std::vector<double> nuc_widths;
+
+
+
+  int equilibration_steps;
+  double initspringK;   // spring constant for initializing double tether
+  double initdt;        // time step for initializing double tether
+  double inittolerance; // how far from specified tether is acceptable when
+
+
+  Eigen::Matrix3Xd xs;
+
+  virtual int single_step(double, double,
+			  const std::vector<Eigen::Vector3d> &,
+			  int, int , bool ) = 0;
+
+
+
+  virtual void setup() = 0;
+
+
+  Eigen::VectorXd constraint_errors;
+
+  
+protected:
+  int Nbeads;           // number of polymer beads
+  double bondlength;    // length of rods connecting beads
+  double zpara;         // parallel coefficient of friction
+  double zperp;         // perpendicular coefficient of friction
+  double temp;
+  double kappa;         // bare bending energy
+
+
 
   SpMat Gmunu;      // geometric tensor
   Eigen::VectorXd rhs_of_G;  // rhs_of_G vector
@@ -63,7 +90,6 @@ class Polymer {
 
   
   SpMat dCdlambda; // matrix for storing Jacobian of dC=0 Newton solver  
-  Eigen::VectorXd constraint_errors;
   Eigen::VectorXd negative_tension_change;
 
 
@@ -73,35 +99,7 @@ class Polymer {
   Eigen::SparseLU< SpMat > jacob_solver;
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
 
-
-  int equilibration_steps;
-  double initspringK;   // spring constant for initializing double tether
-  double initdt;        // time step for initializing double tether
-  double inittolerance; // how far from specified tether is acceptable when
-
-
-
-
-  virtual int single_step(double, double,
-			  const std::vector<Eigen::Vector3d> &,
-			  int, int , bool ) = 0;
-
-
-    
-  virtual void set_G() = 0;
-
-  virtual void set_Hhat() = 0;
-
-  virtual void set_dCdlambda() = 0;
-
-
-protected:
-  int Nbeads;           // number of polymer beads
-  double bondlength;    // length of rods connecting beads
-  double zpara;         // parallel coefficient of friction
-  double zperp;         // perpendicular coefficient of friction
-  double temp;
-  double kappa;         // bare bending energy
+  
 
                                   //  initializing double tether
   
@@ -116,9 +114,6 @@ protected:
 
 
   virtual void compute_noise() = 0;
-  
-
-
   virtual void compute_effective_kappa() = 0;
   
   double Hhat_endblocks(int,int,int);
@@ -159,10 +154,40 @@ protected:
   void final_integrate(double,int,PTYPE);
 
   void calculate_constraint_errors(int offset);
-  Eigen::Matrix<double, 3,Eigen::Dynamic> tmp_xs;
+  Eigen::Matrix3Xd tmp_xs;
+
+
+
+
+
+
+
+  Eigen::Matrix3Xd Fpots,t_forces;
+  Eigen::Matrix3Xd noises,unprojected_noises;
+  Eigen::Matrix3Xd tangents;
+
+  Eigen::Matrix3Xd bonds;
+  
+  std::vector<Eigen::Matrix3d> frictions;
+  
+  void init_atoms_rand();
+  void init_atoms_line();
+  void init_atoms_caret();
 
 private:
 
+  void resize(int Nbeads) {
+    xs.resize(Eigen::NoChange,Nbeads);
+    Fpots.resize(Eigen::NoChange,Nbeads);
+    t_forces.resize(Eigen::NoChange,Nbeads);
+    noises.resize(Eigen::NoChange,Nbeads);
+    unprojected_noises.resize(Eigen::NoChange,Nbeads);
+    tangents.resize(Eigen::NoChange,Nbeads);
+    bonds.resize(Eigen::NoChange,Nbeads-1);
+    frictions.resize(Nbeads);
+  }
+
+  
   double Hhat_diag_val(int);
   double Hhat_loweroff_val(int);
   
@@ -170,7 +195,7 @@ private:
   double dCdlambda_loweroff_val(int);
   double dCdlambda_upperoff_val(int);
 
-  Eigen::Matrix<double, 3,Eigen::Dynamic > tmp_bonds;
+  Eigen::Matrix3Xd tmp_bonds;
 
 
   
