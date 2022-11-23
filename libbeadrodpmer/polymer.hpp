@@ -106,6 +106,8 @@ protected:
   std::vector<Eigen::Matrix3d> frictions;
 
 
+  
+
 private:
 
   void resize(int Nbeads) {

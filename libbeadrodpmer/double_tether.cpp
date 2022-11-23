@@ -40,8 +40,6 @@ DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
 
 }
 
-
-
 int DoubleTether::single_step(double t, double dt,
 			      const std::vector<Eigen::Vector3d> &dFdX_i,
 			      int itermax, int numtries,bool throw_exception)
@@ -482,8 +480,8 @@ void DoubleTether::compute_tension(const Eigen::Vector3d & dXdt_at_1,
 
   set_rhs_of_Hhat(dXdt_at_1,dXdt_at_N);
 
-  Hhat_solver.factorize(Hhat);
-  tension =  Hhat_solver.solve(rhs_of_Hhat);
+  Hhat_solver->factorize(Hhat);
+  tension =  Hhat_solver->solve(rhs_of_Hhat);
   
 }
 
@@ -543,17 +541,17 @@ int DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_
   
   //and then solve
 
-  jacob_solver.factorize(dCdlambda);
+  jacob_solver->factorize(dCdlambda);
 
 
-  if (jacob_solver.info() != Eigen::Success)  {
+  if (jacob_solver->info() != Eigen::Success)  {
     std::cout << "Matrix factorization failed in tension correction on first step."
 	      << std::endl;
     return itermax + 1;
   }
 
   
-  negative_tension_change = jacob_solver.solve(constraint_errors);
+  negative_tension_change = jacob_solver->solve(constraint_errors);
   
   tension = tension - negative_tension_change;
   int count = 0;
@@ -567,16 +565,16 @@ int DoubleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_
     update_dCdlambda(Delta_t);
 
   
-    jacob_solver.factorize(dCdlambda);
+    jacob_solver->factorize(dCdlambda);
 
-    if (jacob_solver.info() != Eigen::Success)  {
+    if (jacob_solver->info() != Eigen::Success)  {
       std::cout << "Matrix factorization failed in tension correction."
 		<< std::endl;
       return itermax + 1;
     }
 
     
-    negative_tension_change = jacob_solver.solve(constraint_errors);
+    negative_tension_change = jacob_solver->solve(constraint_errors);
 
 
     tension = tension - negative_tension_change;

@@ -18,8 +18,6 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
   if (!flag_x0) 
     throw std::runtime_error("Need to specify x0 for single tether polymer.");
 
-
-  
   rhs_of_G.resize(Nbeads+2);
   dummy_for_noise.resize(Nbeads+2);
   Gmunu.resize(Nbeads+2,Nbeads+2);
@@ -46,6 +44,7 @@ SingleTether::SingleTether(const std::vector<std::string> & splitvec)
   bDets.resize(Nbeads+3);
 
 }
+
 
 
 int SingleTether::single_step(double t,double dt,
@@ -200,7 +199,7 @@ void SingleTether::set_G()
 
   Gmunu.setFromTriplets(coefficients.begin(),coefficients.end());
 
-  Gmunu_solver.analyzePattern(Gmunu);
+  Gmunu_solver->analyzePattern(Gmunu);
 
 
   return;
@@ -333,7 +332,7 @@ void SingleTether::set_Hhat()
   Hhat.setFromTriplets(coefficients.begin(),coefficients.end());
 
 
-  Hhat_solver.analyzePattern(Hhat);
+  Hhat_solver->analyzePattern(Hhat);
 
   return;
 
@@ -416,7 +415,7 @@ void SingleTether::set_dCdlambda()
 
   dCdlambda.setFromTriplets(coefficients.begin(),coefficients.end());
 
-  jacob_solver.analyzePattern(dCdlambda);
+  jacob_solver->analyzePattern(dCdlambda);
 
   return;
 
@@ -520,9 +519,9 @@ void SingleTether::compute_noise()
 
   int offset = 3;
   set_rhs_of_G();
-  Gmunu_solver.factorize(Gmunu);
+  Gmunu_solver->factorize(Gmunu);
 
-  dummy_for_noise =  Gmunu_solver.solve(rhs_of_G);
+  dummy_for_noise =  Gmunu_solver->solve(rhs_of_G);
 
   NoTether::update_noise(offset);
 
@@ -540,8 +539,8 @@ void SingleTether::compute_tension(const Eigen::Vector3d & dXdt_at_1)
 
   set_rhs_of_Hhat(dXdt_at_1);
 
-  Hhat_solver.factorize(Hhat);
-  tension =  Hhat_solver.solve(rhs_of_Hhat);
+  Hhat_solver->factorize(Hhat);
+  tension =  Hhat_solver->solve(rhs_of_Hhat);
   
 }
 
@@ -598,16 +597,16 @@ int SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_
   
   //and then solve
 
-  jacob_solver.factorize(dCdlambda);
+  jacob_solver->factorize(dCdlambda);
 
-  if (jacob_solver.info() != Eigen::Success)  {
+  if (jacob_solver->info() != Eigen::Success)  {
     std::cout << "Matrix factorization failed in tension correction on first step."
 	      << std::endl;
     return itermax + 1;
   }
 
   
-  negative_tension_change = jacob_solver.solve(constraint_errors);
+  negative_tension_change = jacob_solver->solve(constraint_errors);
   
   tension = tension - negative_tension_change;
   int count = 0;
@@ -620,16 +619,16 @@ int SingleTether::correct_tension(double Delta_t,const Eigen::Vector3d & X_of_t_
     update_dCdlambda(Delta_t);
 
 
-    jacob_solver.factorize(dCdlambda);
+    jacob_solver->factorize(dCdlambda);
 
 
-    if (jacob_solver.info() != Eigen::Success)  {
+    if (jacob_solver->info() != Eigen::Success)  {
       std::cout << "Matrix factorization failed in tension correction."
 		<< std::endl;
       return itermax + 1;
     }
       
-    negative_tension_change = jacob_solver.solve(constraint_errors);
+    negative_tension_change = jacob_solver->solve(constraint_errors);
 
     
     tension = tension - negative_tension_change;

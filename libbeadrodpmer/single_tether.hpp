@@ -26,7 +26,6 @@ public:
 		  int itermax = 20, int numtries = 5,
 		  bool throw_exception=true) ;
 
-
   virtual void compute_noise() override;
   
   void test_jacob(int,double,const Eigen::Vector3d &);  
@@ -54,10 +53,11 @@ public:
 
   
   virtual void set_rhs_of_G();
+
+
   
 private:
   
-
   void set_rhs_of_Hhat(const Eigen::Vector3d &) ;
 
   virtual void set_G() override;

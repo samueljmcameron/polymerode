@@ -4,6 +4,8 @@
 
 #include "polymer.hpp"
 
+#include <memory>
+
 namespace BeadRodPmer {
 class NoTether : public Polymer {
 public:
@@ -21,7 +23,11 @@ public:
   
   void test_jacob(int,double) ;
 
-
+  NoTether make_NoTether() const {
+    NoTether nt(_splitvec);
+    return nt;
+  }
+  
 protected:
 
   SpMat Gmunu;      // geometric tensor
@@ -39,10 +45,10 @@ protected:
   Eigen::VectorXd negative_tension_change;
 
 
-  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Gmunu_solver;
-  Eigen::SimplicialLDLT< SpMat, Eigen::Lower > Hhat_solver;
+  std::shared_ptr<Eigen::SimplicialLDLT< SpMat, Eigen::Lower >> Gmunu_solver;
+  std::shared_ptr<Eigen::SimplicialLDLT< SpMat, Eigen::Lower >> Hhat_solver ;
 
-  Eigen::SparseLU< SpMat > jacob_solver;
+  std::shared_ptr<Eigen::SparseLU< SpMat >> jacob_solver;
 
   Eigen::VectorXd tDets;
   Eigen::VectorXd bDets;
@@ -115,7 +121,8 @@ private:
 
   Eigen::Matrix3Xd tmp_bonds;
 
-
+  std::vector<std::string> _splitvec;
+ 
   
 };
 };

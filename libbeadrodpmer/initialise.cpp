@@ -1,43 +1,41 @@
-#include "no_tether.hpp"
 #include <Eigen/Core>
 #include <iostream>
 
+#include "double_tether.hpp"
+
 #include "initialise.hpp"
+
 
 namespace BeadRodPmer {
 namespace Initialise {
 /* -------------------------------------------------------------------------- */
 /* This function creates a polymer with endpoints at specific locations in a
    way that is not unreasonably asymmetric (as it would be if one end were
-   tethered). */
+   tethered). 
 /* -------------------------------------------------------------------------- */
 
-void init_atoms(const std::vector<std::string> & splitvec,
-		Eigen::Ref<Eigen::Matrix3Xd> xs_to_set,
-		double springK,double dt, double tolerance,
-		int equilibration_steps)
+template <typename Pmer>
+void init_atoms(const Pmer &pmer, Eigen::Ref<Eigen::Matrix3Xd> xs_to_set)
 {
 
+  NoTether noTethSlice = pmer.make_NoTether();
+  noTethSlice.init_atoms_caret();
   
-  BeadRodPmer::NoTether pmer(splitvec);
-
-  pmer.init_atoms_caret();
-  
-  Eigen::Vector3d x0 = pmer.get_x0();
-  Eigen::Vector3d xN = pmer.get_xN();
+  Eigen::Vector3d x0 = noTethSlice.get_x0();
+  Eigen::Vector3d xN = noTethSlice.get_xN();
 
   
   // delete all nucleation sites
-  pmer.nuc_beads.clear();
+  noTethSlice.nuc_beads.clear();
 
   // then just add a single bead at the end of the polymer to guide it to
   // the desired location
 
-  int b_index = pmer.get_Nbeads()-1;
+  int b_index = noTethSlice.get_Nbeads()-1;
 
 
-  pmer.nuc_beads.push_back(0);
-  pmer.nuc_beads.push_back(b_index);
+  noTethSlice.nuc_beads.push_back(0);
+  noTethSlice.nuc_beads.push_back(b_index);
 
 
 
@@ -49,42 +47,45 @@ void init_atoms(const std::vector<std::string> & splitvec,
 
 
 
-  dFdX_is.push_back(springK*(pmer.xs.col(0)-x0));
+  dFdX_is.push_back(noTethSlice.initspringK*(noTethSlice.xs.col(0)-x0));
   
-  dFdX_is.push_back(springK*(pmer.xs.col(b_index)-xN));
+  dFdX_is.push_back(noTethSlice.initspringK*(noTethSlice.xs.col(b_index)-xN));
 
 
 
-  pmer.setup();
+  noTethSlice.setup();
   
-  pmer.single_step(t,dt,dFdX_is);
-  t += dt;
+  noTethSlice.NoTether::single_step(t,noTethSlice.initdt,dFdX_is);
+  t += noTethSlice.initdt;
 
 
 
 
-  while ((pmer.xs.col(b_index)-xN).norm() > tolerance
-	 || (pmer.xs.col(0)-x0).norm() > tolerance || t < equilibration_steps*dt) {
+  while ((noTethSlice.xs.col(b_index)-xN).norm() > noTethSlice.inittolerance
+	 || (noTethSlice.xs.col(0)-x0).norm() > noTethSlice.inittolerance
+	 || t < noTethSlice.equilibration_steps*noTethSlice.initdt) {
 
 
-    dFdX_is[0] = springK*(pmer.xs.col(0)-x0);
+    dFdX_is[0] = noTethSlice.initspringK*(noTethSlice.xs.col(0)-x0);
 
-    dFdX_is[1] = springK*(pmer.xs.col(b_index)-xN);
+    dFdX_is[1] = noTethSlice.initspringK*(noTethSlice.xs.col(b_index)-xN);
 
 
-    pmer.single_step(t,dt,dFdX_is);
-    t += dt;
+    noTethSlice.NoTether::single_step(t,noTethSlice.initdt,dFdX_is);
+    t += noTethSlice.initdt;
 
   }
 
-  for (int index = 0; index < pmer.get_Nbeads(); index ++ ) 
-    xs_to_set.col(index) = pmer.xs.col(index);
+  for (int index = 0; index < noTethSlice.get_Nbeads(); index ++ ) 
+    xs_to_set.col(index) = noTethSlice.xs.col(index);
   
   return ;
   
   
   
 }
-
+template void init_atoms(const NoTether &, Eigen::Ref<Eigen::Matrix3Xd>);
+template void init_atoms(const SingleTether &, Eigen::Ref<Eigen::Matrix3Xd>);
+template void init_atoms(const DoubleTether &, Eigen::Ref<Eigen::Matrix3Xd>);
 }
 }

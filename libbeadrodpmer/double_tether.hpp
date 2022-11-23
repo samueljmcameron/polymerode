@@ -25,7 +25,6 @@ public:
 		  int itermax = 20, int numtries = 5,
 		  bool throw_exception = true);
 
-
   virtual void compute_noise() final;
 
   

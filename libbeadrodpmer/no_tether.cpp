@@ -12,10 +12,11 @@ namespace BeadRodPmer {
 /* Constructor */
 /* -------------------------------------------------------------------------- */
 NoTether::NoTether(const std::vector<std::string> & splitvec)
-  : Polymer(splitvec)
+  : Polymer(splitvec),Gmunu_solver(new Eigen::SimplicialLDLT< SpMat, Eigen::Lower >),
+    Hhat_solver (new Eigen::SimplicialLDLT< SpMat, Eigen::Lower >),
+    jacob_solver( new Eigen::SparseLU< SpMat >),_splitvec(splitvec)
 {
 
-	      
   rhs_of_G.resize(Nbeads-1);
   dummy_for_noise.resize(Nbeads-1);
   Gmunu.resize(Nbeads-1,Nbeads-1);
@@ -46,6 +47,7 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
   k_effs.resize(Nbeads-2);
   end_inverses.resize(6);
   end_inverses.setZero();  
+	      
 }
 
 
@@ -61,6 +63,7 @@ int NoTether::single_step(double t, double dt,
 			  const std::vector<Eigen::Vector3d> & dFdX_i,
 			  int itermax, int numtries,bool throw_exception)
 {
+
 
   // get here if this step has been restarted numtry times
   if (numtries == 0) {
@@ -743,7 +746,7 @@ void NoTether::set_G()
 
   Gmunu.setFromTriplets(coefficients.begin(),coefficients.end());
 
-  Gmunu_solver.analyzePattern(Gmunu);
+  Gmunu_solver->analyzePattern(Gmunu);
 
   return;
 
@@ -795,7 +798,7 @@ void NoTether::set_Hhat()
   Hhat.setFromTriplets(coefficients.begin(),coefficients.end());
 
 
-  Hhat_solver.analyzePattern(Hhat);
+  Hhat_solver->analyzePattern(Hhat);
 
   return;
 
@@ -817,7 +820,7 @@ void NoTether::set_dCdlambda()
 
   dCdlambda.setFromTriplets(coefficients.begin(),coefficients.end());
 
-  jacob_solver.analyzePattern(dCdlambda);
+  jacob_solver->analyzePattern(dCdlambda);
 
   return;
 
@@ -829,9 +832,9 @@ void NoTether::compute_noise()
 
 
   set_rhs_of_G(0);
-  Gmunu_solver.factorize(Gmunu);
+  Gmunu_solver->factorize(Gmunu);
 
-  dummy_for_noise =  Gmunu_solver.solve(rhs_of_G);
+  dummy_for_noise =  Gmunu_solver->solve(rhs_of_G);
 
   update_noise(0);
   
@@ -845,8 +848,8 @@ void NoTether::compute_tension()
 
   set_rhs_of_Hhat(0);
 
-  Hhat_solver.factorize(Hhat);
-  tension =  Hhat_solver.solve(rhs_of_Hhat);
+  Hhat_solver->factorize(Hhat);
+  tension =  Hhat_solver->solve(rhs_of_Hhat);
   
 }
 
@@ -902,16 +905,16 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
   
   //and then solve
 
-  jacob_solver.factorize(dCdlambda);
+  jacob_solver->factorize(dCdlambda);
 
 
-  if (jacob_solver.info() != Eigen::Success)  {
+  if (jacob_solver->info() != Eigen::Success)  {
     std::cout << "Matrix factorization failed in tension correction on first step."
 	      << std::endl;
     return itermax + 1;
   }
 
-  negative_tension_change = jacob_solver.solve(constraint_errors);
+  negative_tension_change = jacob_solver->solve(constraint_errors);
   
   tension = tension - negative_tension_change;
 
@@ -926,17 +929,17 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
     update_dCdlambda(Delta_t,0);
 
   
-    jacob_solver.factorize(dCdlambda);
+    jacob_solver->factorize(dCdlambda);
 
 
-    if (jacob_solver.info() != Eigen::Success)  {
+    if (jacob_solver->info() != Eigen::Success)  {
       std::cout << "Matrix factorization failed in tension correction."
 		<< std::endl;
       return itermax + 1;
     }
 
     
-    negative_tension_change = jacob_solver.solve(constraint_errors);
+    negative_tension_change = jacob_solver->solve(constraint_errors);
 
     
     tension = tension - negative_tension_change;

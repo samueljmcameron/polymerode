@@ -4,14 +4,11 @@
 #include <vector>
 #include <string>
 
-
 namespace BeadRodPmer {
 namespace Initialise {
 
-void init_atoms(const std::vector<std::string> & splitvec,
-		Eigen::Ref<Eigen::Matrix3Xd> xs_to_set,
-		double springK,double dt, double tolerance,
-		int equilibration_steps);
+template<typename Pmer>
+void init_atoms(const Pmer &,Eigen::Ref<Eigen::Matrix3Xd> );
 }
 }
 
