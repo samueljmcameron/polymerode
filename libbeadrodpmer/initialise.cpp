@@ -75,6 +75,7 @@ void init_atoms(const Pmer &pmer, Eigen::Ref<Eigen::Matrix3Xd> xs)
     noTethSlice.NoTether::single_step(xs,Fs,t,noTethSlice.initdt,dFdX_is);
     t += noTethSlice.initdt;
 
+
   }
   
   return ;

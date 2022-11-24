@@ -63,8 +63,9 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   compute_effective_kappa();
   compute_uc_forces(Fs);
   
-  for (int index = 0; index < nuc_beads.size(); index ++ )
-    Fs.col(index) += -dFdX_i[index];
+  for (int index = 0; index < nuc_beads.size(); index++)
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+
 
   
   compute_tension({0,0,0},{0,0,0},Fs);
@@ -76,8 +77,9 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   compute_effective_kappa();
   compute_uc_forces(Fs);
 
-  for (int index = 0; index < nuc_beads.size(); index ++ )
-    Fs.col(index) += -dFdX_i[index];
+  for (int index = 0; index < nuc_beads.size(); index++)
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+
   
   
   compute_tension({0,0,0},{0,0,0},Fs);
@@ -139,8 +141,9 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   compute_effective_kappa();
   compute_uc_forces(Fs);
   
-  for (int index = 0; index < nuc_beads.size(); index ++ )
-    Fs.col(index) += -dFdX_i[index];
+  for (int index = 0; index < nuc_beads.size(); index++)
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+
 
   
   compute_tension(dX0dt(t+dt/2),dXNdt(t+dt/2),Fs);
@@ -152,8 +155,9 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   compute_effective_kappa();
   compute_uc_forces(Fs);
 
-  for (int index = 0; index < nuc_beads.size(); index ++ )
-    Fs.col(index) += -dFdX_i[index];
+  for (int index = 0; index < nuc_beads.size(); index++)
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+
   
   
   compute_tension(dX0dt(t+dt),dXNdt(t+dt),Fs);
