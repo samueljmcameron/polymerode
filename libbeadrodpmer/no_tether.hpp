@@ -12,13 +12,14 @@ public:
   // constructor
   NoTether(const std::vector<std::string> &);
 
-  virtual int single_step(double, double,
+  virtual int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
+			  Eigen::Ref<Eigen::Matrix3Xd>,double, double,
 			  const std::vector<Eigen::Vector3d> &,
 			  int itermax = 20, int numtries = 5,
 			  bool throw_exception=true) override ;
 
 
-  virtual void setup() override;
+  virtual void setup(const Eigen::Ref<const Eigen::Matrix3Xd> &) override;
 
   
   void test_jacob(int,double) ;
@@ -58,9 +59,10 @@ protected:
   Eigen::VectorXd end_inverses;
 
   
-  int correct_tension(double,int itermax = 20,double tol = 1e-14) ;
+  int correct_tension(Eigen::Ref<Eigen::Matrix3Xd>,const Eigen::Ref<const Eigen::Matrix3Xd> &,
+		      double,int itermax = 20,double tol = 1e-14) ;
 
-  void compute_uc_forces();
+  void compute_uc_forces(Eigen::Ref<Eigen::Matrix3Xd>);
   double Hhat_endblocks(int,int,int);
   double Hhat_leftside(int);
   double dCdlambda_leftside(int);
@@ -71,7 +73,7 @@ protected:
 
   void set_rhs_of_G(int);
 
-  void set_rhs_of_Hhat(int);
+  void set_rhs_of_Hhat(int,const Eigen::Ref<const Eigen::Matrix3Xd> &);
   void init_G_coeffsmatrix(int ,std::vector<T> &);
   void update_G(int);
   void update_Hhat(int);
@@ -88,22 +90,21 @@ protected:
 
   
   
-  void initial_integrate(double,int,PTYPE);
-  void final_integrate(double,int,PTYPE);
+  void initial_integrate(Eigen::Ref<Eigen::Matrix3Xd>,
+			 const Eigen::Ref<const Eigen::Matrix3Xd>&,
+			 double,int,PTYPE);
+  void final_integrate(Eigen::Ref<Eigen::Matrix3Xd>,
+		       const Eigen::Ref<const Eigen::Matrix3Xd>&,
+		       double,int,PTYPE);
 
-  void calculate_constraint_errors(int offset);
-
-
-
+  void calculate_constraint_errors(int offset,const Eigen::Ref<const Eigen::Matrix3Xd>&);
 
   virtual void compute_noise();
-  void compute_tension() ;
+  void compute_tension(const Eigen::Ref<const Eigen::Matrix3Xd>&) ;
 
   virtual void compute_effective_kappa();
 
   Eigen::Matrix3Xd tmp_xs;
-
-  
 
 private:
   

@@ -23,12 +23,10 @@ class Polymer {
   Polymer(const std::vector<std::string> &);
   enum PTYPE {NONE,SINGLE,DOUBLE};
 
-  void compute_tangents_and_friction();
+  void compute_tangents_and_friction(const Eigen::Ref<const Eigen::Matrix3Xd> &xs);
   void set_unprojected_noise(double);
 
   void single_inv_friction(int);
-
-  void add_external_force(const Eigen::Vector3d &,int);
 
   int get_Nbeads() const;
   double get_temp() const;
@@ -53,22 +51,21 @@ class Polymer {
   double inittolerance; // how far from specified tether is acceptable when
 
 
-  Eigen::Matrix3Xd xs;
-
-  virtual int single_step(double, double,
+  virtual int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
+			  Eigen::Ref<Eigen::Matrix3Xd>,double, double,
 			  const std::vector<Eigen::Vector3d> &,
 			  int, int , bool ) = 0;
 
 
 
-  virtual void setup() = 0;
+  virtual void setup(const Eigen::Ref<const Eigen::Matrix3Xd> &) = 0;
 
 
   Eigen::VectorXd constraint_errors;
   
-  void init_atoms_rand();
-  void init_atoms_line();
-  void init_atoms_caret();
+  void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd>);
+  void init_atoms_line(Eigen::Ref<Eigen::Matrix3Xd>);
+  void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd>);
   
 protected:
   int Nbeads;           // number of polymer beads
@@ -97,7 +94,7 @@ protected:
 
 
 
-  Eigen::Matrix3Xd Fpots,t_forces;
+  Eigen::Matrix3Xd t_forces;
   Eigen::Matrix3Xd noises,unprojected_noises;
   Eigen::Matrix3Xd tangents;
 
@@ -111,8 +108,6 @@ protected:
 private:
 
   void resize(int Nbeads) {
-    xs.resize(Eigen::NoChange,Nbeads);
-    Fpots.resize(Eigen::NoChange,Nbeads);
     t_forces.resize(Eigen::NoChange,Nbeads);
     noises.resize(Eigen::NoChange,Nbeads);
     unprojected_noises.resize(Eigen::NoChange,Nbeads);

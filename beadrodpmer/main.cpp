@@ -3,9 +3,6 @@
 #include "globalparams.hpp"
 #include "input.hpp"
 #include "run.hpp"
-#include "initialise.hpp"
-
-#include <Eigen/SparseLU>
 
 #include <iostream>
 #include <fstream>
@@ -97,7 +94,6 @@ int main(int argc, char* argv[])
   if (simulation_type == "run") {
     if (polymertype == "double_tether") {
       BeadRodPmer::DoubleTether pmer(splitvec);
-      BeadRodPmer::Initialise::init_atoms(pmer,pmer.xs);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;
@@ -109,7 +105,6 @@ int main(int argc, char* argv[])
  
     } else if (polymertype == "single_tether") {
       BeadRodPmer::SingleTether pmer(splitvec);
-      BeadRodPmer::Initialise::init_atoms(pmer,pmer.xs);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;
@@ -121,7 +116,6 @@ int main(int argc, char* argv[])
       
     } else if (polymertype == "no_tether") {
       BeadRodPmer::NoTether pmer(splitvec);
-      BeadRodPmer::Initialise::init_atoms(pmer,pmer.xs);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;

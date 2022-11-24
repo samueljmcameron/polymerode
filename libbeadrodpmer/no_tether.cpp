@@ -52,14 +52,15 @@ NoTether::NoTether(const std::vector<std::string> & splitvec)
 
 
 
-void NoTether::setup() {
-  compute_tangents_and_friction();
+void NoTether::setup(const Eigen::Ref<const Eigen::Matrix3Xd> &xs) {
+  compute_tangents_and_friction(xs);
   set_G();
   set_Hhat();
   set_dCdlambda();
 }
 
-int NoTether::single_step(double t, double dt,
+int NoTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			  Eigen::Ref<Eigen::Matrix3Xd> Fs,double t, double dt,
 			  const std::vector<Eigen::Vector3d> & dFdX_i,
 			  int itermax, int numtries,bool throw_exception)
 {
@@ -73,34 +74,34 @@ int NoTether::single_step(double t, double dt,
       return -1;
   }
 
-  
+  Fs.setZero();
   set_unprojected_noise(dt);
   update_G(0);
   update_Hhat(0);
   compute_noise();
   compute_effective_kappa();
-  compute_uc_forces();
+  compute_uc_forces(Fs);
 
   for (int index = 0; index < nuc_beads.size(); index ++ )
-    add_external_force(dFdX_i[index],nuc_beads[index]);
+    Fs.col(index) += -dFdX_i[index];
   
-  compute_tension();
-  initial_integrate(dt,0,NONE);
+  compute_tension(Fs);
+  initial_integrate(xs,Fs,dt,0,NONE);
   
 
-  
+  Fs.setZero();
   update_Hhat(0);
   compute_effective_kappa();
-  compute_uc_forces();
+  compute_uc_forces(Fs);
   
   for (int index = 0; index < nuc_beads.size(); index ++ )
-    add_external_force(dFdX_i[index],nuc_beads[index]);
+    Fs.col(index) += -dFdX_i[index];
   
   
-  compute_tension();
+  compute_tension(Fs);
 
   
-  int iterations = correct_tension(dt,itermax,1e-8);
+  int iterations = correct_tension(xs,Fs,dt,itermax,1e-8);
 
   if (iterations > itermax) {
     numtries -= 1;
@@ -110,12 +111,12 @@ int NoTether::single_step(double t, double dt,
     for (int i = 0; i < get_Nbeads(); i++) 
       xs.col(i) = tmp_xs.col(i);
 
-    compute_tangents_and_friction();
-    return single_step(t,dt,dFdX_i,itermax,numtries,throw_exception);
+    compute_tangents_and_friction(xs);
+    return single_step(xs,Fs,t,dt,dFdX_i,itermax,numtries,throw_exception);
   } else {
-    final_integrate(dt,0,NONE);
+    final_integrate(xs,Fs,dt,0,NONE);
   
-    compute_tangents_and_friction();
+    compute_tangents_and_friction(xs);
   }
 
   return 0;
@@ -127,48 +128,48 @@ int NoTether::single_step(double t, double dt,
 /* -------------------------------------------------------------------------- */
 /* Compute forces on the particles. */
 /* -------------------------------------------------------------------------- */
-void NoTether::compute_uc_forces()
+void NoTether::compute_uc_forces(Eigen::Ref<Eigen::Matrix3Xd> Fs)
 {
 
-  Fpots.col(0) = (end_inverses({0,1,2}).dot(bonds.col(0))*bonds.col(0)
-		   -1*k_effs(0)*(bonds.col(1)-costhetas(0)*bonds.col(0)));
+  Fs.col(0) += (end_inverses({0,1,2}).dot(bonds.col(0))*bonds.col(0)
+		-1*k_effs(0)*(bonds.col(1)-costhetas(0)*bonds.col(0)));
 
-  Fpots.col(0) -= end_inverses({0,1,2});
+  Fs.col(0) -= end_inverses({0,1,2});
 
-  Fpots.col(1) = (-end_inverses({0,1,2}).dot(bonds.col(0))*bonds.col(0)
-		   +k_effs(0)*(bonds.col(1)-costhetas(0)*bonds.col(0)
-			       - (bonds.col(0)-costhetas(0)*bonds.col(1)))
-		   - k_effs(1)*(bonds.col(2)-costhetas(1)*bonds.col(1)));
+  Fs.col(1) += (-end_inverses({0,1,2}).dot(bonds.col(0))*bonds.col(0)
+		+k_effs(0)*(bonds.col(1)-costhetas(0)*bonds.col(0)
+			    - (bonds.col(0)-costhetas(0)*bonds.col(1)))
+		- k_effs(1)*(bonds.col(2)-costhetas(1)*bonds.col(1)));
 
 
-  Fpots.col(1) += end_inverses({0,1,2});
+  Fs.col(1) += end_inverses({0,1,2});
 
   			
   for (int k = 2; k < Nbeads-2; k++) {
 
-    Fpots.col(k) = (k_effs(k-1)*(bonds.col(k)-costhetas(k-1)*bonds.col(k-1)
-				  -(bonds.col(k-1)-costhetas(k-1)*bonds.col(k)))
-		     -k_effs(k)*(bonds.col(k+1)-costhetas(k)*bonds.col(k))
-		     +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
+    Fs.col(k) += (k_effs(k-1)*(bonds.col(k)-costhetas(k-1)*bonds.col(k-1)
+			       -(bonds.col(k-1)-costhetas(k-1)*bonds.col(k)))
+		  -k_effs(k)*(bonds.col(k+1)-costhetas(k)*bonds.col(k))
+		  +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
     
   }
 
   int k = Nbeads-2;
   
-  Fpots.col(k) = (-end_inverses({3,4,5}).dot(bonds.col(k))*bonds.col(k)
-		   +k_effs(k-1)*(bonds.col(k)-costhetas(k-1)*bonds.col(k-1)
-				 -(bonds.col(k-1)-costhetas(k-1)*bonds.col(k)))
-		   +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
+  Fs.col(k) += (-end_inverses({3,4,5}).dot(bonds.col(k))*bonds.col(k)
+		+k_effs(k-1)*(bonds.col(k)-costhetas(k-1)*bonds.col(k-1)
+			      -(bonds.col(k-1)-costhetas(k-1)*bonds.col(k)))
+		+k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
   
-  Fpots.col(k) += end_inverses({3,4,5});
+  Fs.col(k) += end_inverses({3,4,5});
 
   k = Nbeads-1;
 
-  Fpots.col(k) = (end_inverses({3,4,5}).dot(bonds.col(k-1))*bonds.col(k-1)
-		   +k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
+  Fs.col(k) += (end_inverses({3,4,5}).dot(bonds.col(k-1))*bonds.col(k-1)
+		+k_effs(k-2)*(bonds.col(k-2)-costhetas(k-2)*bonds.col(k-1)));
 
 
-  Fpots.col(k) -= end_inverses({3,4,5});
+  Fs.col(k) -= end_inverses({3,4,5});
 
   return;
   
@@ -406,7 +407,7 @@ void NoTether::set_bdets_and_tdets(int offset)
 /* ---------------------------------------------------------------------------- */
 /* RHS of Hhat*lambda = Q. */
 /* ---------------------------------------------------------------------------- */
-void NoTether::set_rhs_of_Hhat(int offset)
+void NoTether::set_rhs_of_Hhat(int offset,const Eigen::Ref<const Eigen::Matrix3Xd> &Fs)
 {
 
   
@@ -414,9 +415,9 @@ void NoTether::set_rhs_of_Hhat(int offset)
   for (int i = 0; i< Nbeads-1; i++) {
 
 
-    rhs_of_Hhat(i+offset) = bonds.col(i).dot(frictions[i+1]*(Fpots.col(i+1)
+    rhs_of_Hhat(i+offset) = bonds.col(i).dot(frictions[i+1]*(Fs.col(i+1)
 								  +noises.col(i+1))
-					     -frictions[i]*(Fpots.col(i)
+					     -frictions[i]*(Fs.col(i)
 								 +noises.col(i)));
     
   }
@@ -574,7 +575,9 @@ void NoTether::update_noise(int offset)
 
 
 
-void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
+void NoTether::initial_integrate(Eigen::Ref<Eigen::Matrix3Xd> xs,
+				 const Eigen::Ref<const Eigen::Matrix3Xd> &Fs,
+				 double Delta_t,int offset, PTYPE cflag)
 {
   
   double tmp = Delta_t/2.0;
@@ -589,7 +592,7 @@ void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
 
   if (cflag == SINGLE || cflag == DOUBLE) t_forces.col(0) -= tension({0,1,2});
 
-  xs.col(0) += tmp*frictions[0]*(Fpots.col(0)+noises.col(0)+t_forces.col(0));
+  xs.col(0) += tmp*frictions[0]*(Fs.col(0)+noises.col(0)+t_forces.col(0));
 
   i = 1;
   tmp_xs.col(i) = xs.col(i);
@@ -598,7 +601,7 @@ void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
   t_forces.col(i) = tension(offset+i)*bonds.col(i)-tension(offset+i-1)*bonds.col(i-1);
   
   
-  xs.col(i) += tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+  xs.col(i) += tmp*frictions[i]*(Fs.col(i)+noises.col(i)+t_forces.col(i));
 
   bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
   tmp_bonds.col(i-1) = bonds.col(i-1);
@@ -617,7 +620,7 @@ void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
     t_forces.col(i) = tension(offset+i)*bonds.col(i)-tension(offset-1+i)*bonds.col(i-1);
 
 
-    xs.col(i) += tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+    xs.col(i) += tmp*frictions[i]*(Fs.col(i)+noises.col(i)+t_forces.col(i));
 
     bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
     tmp_bonds.col(i-1) = bonds.col(i-1);
@@ -649,7 +652,7 @@ void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
   }
 
 
-  xs.col(i) += tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+  xs.col(i) += tmp*frictions[i]*(Fs.col(i)+noises.col(i)+t_forces.col(i));
 
   bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
   tmp_bonds.col(i-1) = bonds.col(i-1);
@@ -678,7 +681,9 @@ void NoTether::initial_integrate(double Delta_t,int offset, PTYPE cflag)
 /*----------------------------------------------------------------------------*/
 /* Computes the final bead positions and unnormalised bond tangents. */
 /*----------------------------------------------------------------------------*/
-void NoTether::final_integrate(double Delta_t, int offset,PTYPE cflag)
+void NoTether::final_integrate(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			       const Eigen::Ref<const Eigen::Matrix3Xd> &Fs,
+			       double Delta_t, int offset,PTYPE cflag)
 {
   
   double tmp = Delta_t;
@@ -690,7 +695,7 @@ void NoTether::final_integrate(double Delta_t, int offset,PTYPE cflag)
     t_forces.col(0) -= tension({0,1,2});
   }
 
-  xs.col(0) = tmp_xs.col(0) + tmp*frictions[0]*(Fpots.col(0)+noises.col(0)+t_forces.col(0));
+  xs.col(0) = tmp_xs.col(0) + tmp*frictions[0]*(Fs.col(0)+noises.col(0)+t_forces.col(0));
 
 
     
@@ -698,7 +703,7 @@ void NoTether::final_integrate(double Delta_t, int offset,PTYPE cflag)
 
     t_forces.col(i) = tension(offset+i)*bonds.col(i)-tension(offset-1+i)*bonds.col(i-1);
 
-    xs.col(i) = tmp_xs.col(i) + tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+    xs.col(i) = tmp_xs.col(i) + tmp*frictions[i]*(Fs.col(i)+noises.col(i)+t_forces.col(i));
     tmp_bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
     
   }
@@ -712,7 +717,7 @@ void NoTether::final_integrate(double Delta_t, int offset,PTYPE cflag)
     t_forces.col(i) -= tension({ind,ind+1,ind+2});
   }
 
-  xs.col(i) = tmp_xs.col(i) + tmp*frictions[i]*(Fpots.col(i)+noises.col(i)+t_forces.col(i));
+  xs.col(i) = tmp_xs.col(i) + tmp*frictions[i]*(Fs.col(i)+noises.col(i)+t_forces.col(i));
   tmp_bonds.col(i-1) = (xs.col(i)-xs.col(i-1))/bondlength;
 
   
@@ -723,7 +728,8 @@ void NoTether::final_integrate(double Delta_t, int offset,PTYPE cflag)
   
   
   
-void NoTether::calculate_constraint_errors(int offset)
+void NoTether::calculate_constraint_errors(int offset,
+					   const Eigen::Ref<const Eigen::Matrix3Xd> &xs)
 {
   for (int mu = 1; mu < Nbeads; mu++) {
     constraint_errors(mu-1+offset) = (xs.col(mu)-xs.col(mu-1)).norm()-bondlength;
@@ -841,18 +847,18 @@ void NoTether::compute_noise()
 }
 
 
-void NoTether::compute_tension()
+void NoTether::compute_tension(const Eigen::Ref<const Eigen::Matrix3Xd> &Fs)
 {
 
 
 
-  set_rhs_of_Hhat(0);
+  set_rhs_of_Hhat(0,Fs);
 
   Hhat_solver->factorize(Hhat);
   tension =  Hhat_solver->solve(rhs_of_Hhat);
   
 }
-
+/*
 void NoTether::test_jacob(int mu,double Delta_t)
 {
 
@@ -893,13 +899,15 @@ void NoTether::test_jacob(int mu,double Delta_t)
   
   return;
 }  
-
-int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
+*/
+int NoTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			      const Eigen::Ref<const Eigen::Matrix3Xd> &Fs,
+			      double Delta_t,int itermax,double tolerance)
 {
 
   // set C_mu and dC_mu/dlambda_nu
-  final_integrate(Delta_t,0,NONE);
-  calculate_constraint_errors(0);
+  final_integrate(xs,Fs,Delta_t,0,NONE);
+  calculate_constraint_errors(0,xs);
   update_dCdlambda(Delta_t,0);
 
   
@@ -924,8 +932,8 @@ int NoTether::correct_tension(double Delta_t,int itermax,double tolerance)
 
 
 
-    final_integrate(Delta_t,0,NONE);
-    calculate_constraint_errors(0);
+    final_integrate(xs,Fs,Delta_t,0,NONE);
+    calculate_constraint_errors(0,xs);
     update_dCdlambda(Delta_t,0);
 
   

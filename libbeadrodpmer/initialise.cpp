@@ -15,11 +15,14 @@ namespace Initialise {
 /* -------------------------------------------------------------------------- */
 
 template <typename Pmer>
-void init_atoms(const Pmer &pmer, Eigen::Ref<Eigen::Matrix3Xd> xs_to_set)
+void init_atoms(const Pmer &pmer, Eigen::Ref<Eigen::Matrix3Xd> xs)
 {
 
+  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads());
+
+  
   NoTether noTethSlice = pmer.make_NoTether();
-  noTethSlice.init_atoms_caret();
+  noTethSlice.init_atoms_caret(xs);
   
   Eigen::Vector3d x0 = noTethSlice.get_x0();
   Eigen::Vector3d xN = noTethSlice.get_xN();
@@ -47,37 +50,32 @@ void init_atoms(const Pmer &pmer, Eigen::Ref<Eigen::Matrix3Xd> xs_to_set)
 
 
 
-  dFdX_is.push_back(noTethSlice.initspringK*(noTethSlice.xs.col(0)-x0));
+  dFdX_is.push_back(noTethSlice.initspringK*(xs.col(0)-x0));
   
-  dFdX_is.push_back(noTethSlice.initspringK*(noTethSlice.xs.col(b_index)-xN));
+  dFdX_is.push_back(noTethSlice.initspringK*(xs.col(b_index)-xN));
 
 
 
-  noTethSlice.setup();
+  noTethSlice.setup(xs);
   
-  noTethSlice.NoTether::single_step(t,noTethSlice.initdt,dFdX_is);
+  noTethSlice.NoTether::single_step(xs,Fs,t,noTethSlice.initdt,dFdX_is);
   t += noTethSlice.initdt;
 
 
-
-
-  while ((noTethSlice.xs.col(b_index)-xN).norm() > noTethSlice.inittolerance
-	 || (noTethSlice.xs.col(0)-x0).norm() > noTethSlice.inittolerance
+  while ((xs.col(b_index)-xN).norm() > noTethSlice.inittolerance
+	 || (xs.col(0)-x0).norm() > noTethSlice.inittolerance
 	 || t < noTethSlice.equilibration_steps*noTethSlice.initdt) {
 
 
-    dFdX_is[0] = noTethSlice.initspringK*(noTethSlice.xs.col(0)-x0);
+    dFdX_is[0] = noTethSlice.initspringK*(xs.col(0)-x0);
 
-    dFdX_is[1] = noTethSlice.initspringK*(noTethSlice.xs.col(b_index)-xN);
+    dFdX_is[1] = noTethSlice.initspringK*(xs.col(b_index)-xN);
 
 
-    noTethSlice.NoTether::single_step(t,noTethSlice.initdt,dFdX_is);
+    noTethSlice.NoTether::single_step(xs,Fs,t,noTethSlice.initdt,dFdX_is);
     t += noTethSlice.initdt;
 
   }
-
-  for (int index = 0; index < noTethSlice.get_Nbeads(); index ++ ) 
-    xs_to_set.col(index) = noTethSlice.xs.col(index);
   
   return ;
   
