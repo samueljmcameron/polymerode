@@ -56,12 +56,17 @@ public:
 void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 {
 
+  // making the arrays too big to demonstrate that there is minimal slow down
+  // when slicing an array (necessary to show if I want multiple polymers
+  // interacting)
+  Eigen::Matrix3Xd xs(3,pmer.get_Nbeads()+20);
+  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads()+20);
 
-  Eigen::Matrix3Xd xs(3,pmer.get_Nbeads());
-  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads());
+  int Nbeads = pmer.get_Nbeads();
+  int offset = 5;
 
   
-  BeadRodPmer::Initialise::init_atoms(pmer,xs);
+  BeadRodPmer::Initialise::init_atoms(pmer,xs.middleCols(offset,Nbeads));
 
   int numsteps = gp.steps;
 
@@ -71,7 +76,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   double t = 0;
 
-  movingEnds move(0.1,100,xs.col(0),xs.col(pmer.get_Nbeads()-1));
+  movingEnds move(0.1,100,xs.middleCols(offset,Nbeads).col(0),xs.middleCols(offset,Nbeads).col(pmer.get_Nbeads()-1));
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
   auto XN_t = std::bind(&movingEnds::XN_t,&move,std::placeholders::_1);
@@ -91,20 +96,20 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   
   std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
-  BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+  BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
-  pmer.setup(xs);
+  pmer.setup(xs.middleCols(offset,Nbeads));
 
-  pmer.single_step(xs,Fs,t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
+  pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
   t += dt;
 
   if (dump_every == 1) {
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
-    BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+    BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
 
     BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
@@ -113,14 +118,14 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
-    std::cout << "t = " << t << std::endl;
 
-    pmer.single_step(xs,Fs,t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
+
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
     t += dt;
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-      BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+      BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
 
       BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
@@ -131,9 +136,6 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
-  std::cout << "Constraints are different than zero: " << std::endl;
-  std::cout << pmer.constraint_errors << std::endl;
-  
 
   return;
 }
@@ -143,11 +145,17 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 {
 
-  Eigen::Matrix3Xd xs(3,pmer.get_Nbeads());
-  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads());
+  // making the arrays too big to demonstrate that there is minimal slow down
+  // when slicing an array (necessary to show if I want multiple polymers
+  // interacting)
+  Eigen::Matrix3Xd xs(3,pmer.get_Nbeads()+20);
+  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads()+20);
+
+  int Nbeads = pmer.get_Nbeads();
+  int offset = 5;
 
   
-  BeadRodPmer::Initialise::init_atoms(pmer,xs);
+  BeadRodPmer::Initialise::init_atoms(pmer,xs.middleCols(offset,Nbeads));
   int numsteps = gp.steps;
 
   double dt = gp.timestep;
@@ -158,7 +166,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   // since only fixing one end, the XN argument of the move class is ignored
   // so putting in the zero vector {0,0,0} as a placeholder
-  movingEnds move(0.1,100,xs.col(0),{0,0,0});
+  movingEnds move(0.1,100,xs.middleCols(offset,Nbeads).col(0),{0,0,0});
 
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
@@ -178,19 +186,19 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   
   std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
-  BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+  BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
-  pmer.setup(xs);
-  pmer.single_step(xs,Fs,t,dt,dFdX_is,X0_t,dX0dt);
+  pmer.setup(xs.middleCols(offset,Nbeads));
+  pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,dX0dt);
   t += dt;
 
   if (dump_every == 1) {
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
-    BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+    BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
 
     BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
@@ -199,15 +207,15 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
-    std::cout << "t = " << t << std::endl;
 
-    pmer.single_step(xs,Fs,t,dt,dFdX_is,X0_t,dX0dt);
+
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,dX0dt);
     t += dt;
 
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-      BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+      BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
 
       BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
@@ -218,9 +226,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
-  std::cout << "Constraints are different than zero: " << std::endl;
-  std::cout << pmer.constraint_errors << std::endl;
-  
+
 
   return;
 }
@@ -228,12 +234,16 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
 {
 
+  // making the arrays too big to demonstrate that there is minimal slow down
+  // when slicing an array (necessary to show if I want multiple polymers
+  // interacting)
+  Eigen::Matrix3Xd xs(3,pmer.get_Nbeads()+20);
+  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads()+20);
 
+  int Nbeads = pmer.get_Nbeads();
+  int offset = 5;
   
-  Eigen::Matrix3Xd xs(3,pmer.get_Nbeads());
-  Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads());
-  
-  BeadRodPmer::Initialise::init_atoms(pmer,xs);
+  BeadRodPmer::Initialise::init_atoms(pmer,xs.middleCols(offset,Nbeads));
   int numsteps = gp.steps;
 
   double dt = gp.timestep;
@@ -255,19 +265,19 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
 
   
   std::string fname = gp.dump_file + std::string("_") + std::to_string(0) + std::string(".vtp");
-  BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+  BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
 
-  pmer.setup(xs);
-  pmer.single_step(xs,Fs,t,dt,dFdX_is);
+  pmer.setup(xs.middleCols(offset,Nbeads));
+  pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is);
   t += dt;
 
   if (dump_every == 1) {
 
     fname = gp.dump_file + std::string("_") + std::to_string(1) + std::string(".vtp");
   
-    BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+    BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
 
     BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
@@ -276,15 +286,15 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
 
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
-    std::cout << "t = " << t << std::endl;
+
     
-    pmer.single_step(xs,Fs,t,dt,dFdX_is);
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is);
     t += dt;
 
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
   
-      BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
+      BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs.middleCols(offset,Nbeads));
 
       BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
@@ -295,9 +305,6 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
 
   BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
-  std::cout << "Constraints are different than zero: " << std::endl;
-  std::cout << pmer.constraint_errors << std::endl;
-  
 
   return;
 }
