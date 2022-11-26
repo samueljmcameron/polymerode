@@ -4,15 +4,15 @@
 #include <string>
 #include <vector>
 
-#include "polymer.hpp"
+#include <Eigen/Core>
 
 namespace BeadRodPmer {
 namespace ioVTK {
 
 
-  void writeVTKPolyData(std::string,const Polymer &);
+  void writeVTKPolyData(std::string,const Eigen::Ref<Eigen::Matrix3Xd>);
 
-  void readVTKPolyData(Polymer &, std::string);
+  void readVTKPolyData(Eigen::Ref<Eigen::Matrix3Xd>, std::string);
   
   void writeVTKcollectionHeader(const std::string);
   void writeVTKcollectionMiddle(const std::string,

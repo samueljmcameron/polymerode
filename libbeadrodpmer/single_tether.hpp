@@ -13,13 +13,15 @@ public:
   SingleTether(const std::vector<std::string> &);
   
 
-  virtual int single_step(double,double,
+  virtual int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
+			  Eigen::Ref<Eigen::Matrix3Xd>,double,double,
 			  const std::vector<Eigen::Vector3d> &,
 			  int itermax = 20, int numtries = 5,
 			  bool throw_exception=true) override;
 
   
-  int single_step(double,double,
+  int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
+		  Eigen::Ref<Eigen::Matrix3Xd>,double,double,
 		  const std::vector<Eigen::Vector3d> &,
 		  std::function<Eigen::Vector3d (double)>,
 		  std::function<Eigen::Vector3d (double)>,
@@ -33,11 +35,15 @@ public:
 
 
 
-  void compute_tension(const Eigen::Vector3d &);
-  int correct_tension(double,const Eigen::Vector3d&,
+  void compute_tension(const Eigen::Vector3d &,
+		       const Eigen::Ref<const Eigen::Matrix3Xd>&);
+  int correct_tension(Eigen::Ref<Eigen::Matrix3Xd>,
+		      const Eigen::Ref<const Eigen::Matrix3Xd>&,
+		      double,const Eigen::Vector3d&,
 		      int itermax = 20, double tol = 1e-14) ;
 
-  void calculate_constraint_errors(const Eigen::Vector3d &) ;  
+  void calculate_constraint_errors(const Eigen::Vector3d &,
+				   const Eigen::Ref<const Eigen::Matrix3Xd>&) ;  
 
 
   void set_bdets_and_tdets();
@@ -58,7 +64,8 @@ public:
   
 private:
   
-  void set_rhs_of_Hhat(const Eigen::Vector3d &) ;
+  void set_rhs_of_Hhat(const Eigen::Vector3d &,
+		       const Eigen::Ref<const Eigen::Matrix3Xd>&) ;
 
   virtual void set_G() override;
   virtual void set_Hhat() override;

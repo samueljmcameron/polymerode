@@ -145,7 +145,7 @@ Polymer::Polymer(const std::vector<std::string> & splitvec)
 /* Also computes cos(theta_i) relevant for potential force. */
 /* Call only at the start of the time step (NOT the midstep). */
 /* ---------------------------------------------------------------------------- */
-void Polymer::compute_tangents_and_friction()
+void Polymer::compute_tangents_and_friction(const Eigen::Ref<const Eigen::Matrix3Xd> &xs)
 {
 
   double tangentnorm;
@@ -229,13 +229,6 @@ void Polymer::single_inv_friction(int i)
 
     frictions[i](j,j) += 1./zperp;
 
-  return;
-
-}
-
-void Polymer::add_external_force(const Eigen::Vector3d &dFdX, int i)
-{
-  Fpots.col(i) += -dFdX;
   return;
 
 }
@@ -329,7 +322,7 @@ void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
 /* -------------------------------------------------------------------------- */
 /* Call to set random configuration. */
 /* -------------------------------------------------------------------------- */
-void Polymer::init_atoms_rand()
+void Polymer::init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd> xs)
 {
 
   Eigen::Vector3d u(1,0,0);
@@ -411,7 +404,7 @@ void Polymer::init_atoms_rand()
 /* Call to set line configuration so that polymer intersects initial points
    x0 and xN with same centre of mass as the initial points. */
 /* -------------------------------------------------------------------------- */
-void Polymer::init_atoms_line()
+void Polymer::init_atoms_line(Eigen::Ref<Eigen::Matrix3Xd> xs)
 {
 
   double length_init = (xN-x0).norm();
@@ -424,7 +417,7 @@ void Polymer::init_atoms_line()
 
 }
 
-void Polymer::init_atoms_caret()
+void Polymer::init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs)
 {
 
 
@@ -437,7 +430,7 @@ void Polymer::init_atoms_caret()
   
   Eigen::Vector3d dd = xN-x0;
 
-  if (dd.norm() > bondlength*(Nbeads-1)) {
+  if (dd.norm() > bondlength*(xs.cols()-1)) {
     throw std::runtime_error("|x0-xN| is longer than the polymer.");
   }
 
@@ -469,10 +462,10 @@ void Polymer::init_atoms_caret()
   // since the parameterisation only works for an odd number of beads, we overshoot
   // the point x0 for an even number of beads by pretending the system only has
   // Nbeads-1 beads, so the final bead gets put past the point x0
-  if (Nbeads % 2 == 0) {
-    fakelength = (Nbeads-2)*bondlength;
+  if (xs.cols() % 2 == 0) {
+    fakelength = (xs.cols()-2)*bondlength;
   } else {
-    fakelength = (Nbeads-1)*bondlength;
+    fakelength = (xs.cols()-1)*bondlength;
   }
   
 
@@ -486,12 +479,12 @@ void Polymer::init_atoms_caret()
   double dtp = 1.0*bondlength/fakelength;
 
   
-  for (int i = 0; i < Nbeads; i++) {
+  for (int i = 0; i < xs.cols(); i++) {
     
     tp = i*dtp;
 
     // integer division rounds toward zero
-    if (i < Nbeads/2) {
+    if (i < xs.cols()/2) {
       xs.col(i) = x0 + 2*alpha*tp;
     } else {
       xs.col(i) = xN + 2*beta*(1-tp);

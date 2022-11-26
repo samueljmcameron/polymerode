@@ -11,7 +11,8 @@ namespace BeadRodPmer {
 
 /* Simple function to write a vtk file with binary data. */
 
-void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
+void ioVTK::writeVTKPolyData(std::string fname,
+			     const Eigen::Ref<Eigen::Matrix3Xd> xs)
 /*============================================================================*/
 /*
   Write scalar image data to a vtk (and paraview) compatible file
@@ -23,7 +24,7 @@ void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
   fname : string
       Name of file to save with extension (either ".vtp" or ".pvtp").
 
-  pmer : polymer object
+  xs : beads to save
 */
 /*============================================================================*/
 
@@ -40,14 +41,14 @@ void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
 	 << "<VTKFile type=\"PolyData\"  version=\"1.0\""
 	 << " byte_order=\"LittleEndian\">" << std::endl
 	 << "<PolyData>" << std::endl
-	 << "<Piece NumberOfPoints=\"" << pmer.get_Nbeads()
+	 << "<Piece NumberOfPoints=\"" << xs.cols()
 	 << "\" NumberOfLines=\"1\">" << std::endl << "<Points>" << std::endl
 	 << "<DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">"
 	 << std::endl;
 
-  for (int i = 0; i < pmer.get_Nbeads(); i++) {
-    myfile << pmer.xs.col(i)(0) << " " << pmer.xs.col(i)(1) << " "
-	   << pmer.xs.col(i)(2) << " ";
+  for (int i = 0; i < xs.cols(); i++) {
+    myfile << xs.col(i)(0) << " " << xs.col(i)(1) << " "
+	   << xs.col(i)(2) << " ";
     
   }
   myfile << std::endl << "</DataArray>" << std::endl
@@ -56,11 +57,11 @@ void ioVTK::writeVTKPolyData(std::string fname,const Polymer &pmer)
 	 << "<DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">"
 	 << std::endl;
 
-  for (int i = 0; i < pmer.get_Nbeads(); i++) 
+  for (int i = 0; i < xs.cols(); i++) 
     myfile << i << " ";
   myfile << std::endl << "</DataArray>" << std::endl
 	 << "<DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">"
-	 << std::endl << pmer.get_Nbeads() << std::endl
+	 << std::endl << xs.cols() << std::endl
 	 << "</DataArray>" << std::endl
     	 << "</Lines>" << std::endl
 	 << "</Piece>" << std::endl
@@ -174,7 +175,7 @@ void ioVTK::restartVTKcollection(const std::string fname)
 
 /* Simple function to write a vtk file with binary data. */
 
-void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
+void ioVTK::readVTKPolyData(Eigen::Ref<Eigen::Matrix3Xd> xs,std::string fname)
 /*============================================================================*/
 /*
   Read poly data to a vtk (and paraview) compatible file
@@ -183,7 +184,7 @@ void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
   Parameters
   ----------
 
-  pmer : polymer object
+  xs : beads to overwrite
 
   fname : string
       Name of file to read from with extension (either ".vti" or ".pvti").
@@ -212,10 +213,10 @@ void ioVTK::readVTKPolyData(Polymer &pmer,std::string fname)
   
   std::stringstream ss(stopline);
   
-  for (int i = 0; i < pmer.get_Nbeads(); i++) {
-    ss >> pmer.xs.col(i)(0);
-    ss >> pmer.xs.col(i)(1);
-    ss >> pmer.xs.col(i)(2);
+  for (int i = 0; i < xs.cols(); i++) {
+    ss >> xs.col(i)(0);
+    ss >> xs.col(i)(1);
+    ss >> xs.col(i)(2);
   }
 
   myfile.close();
