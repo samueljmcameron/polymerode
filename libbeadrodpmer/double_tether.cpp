@@ -56,38 +56,21 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   }
 
   Fs.setZero();
-  set_unprojected_noise(dt);
-  update_G();
-  update_Hhat();
-  compute_noise();
-  compute_effective_kappa();
-  compute_uc_forces(Fs);
   
   for (int index = 0; index < nuc_beads.size(); index++)
     Fs.col(nuc_beads[index]) += -dFdX_i[index];  
 
 
   
-  compute_tension({0,0,0},{0,0,0},Fs);
-  initial_integrate(xs,Fs,dt,3,DOUBLE);
-  
+  first_step(xs,Fs,dt);
 
   Fs.setZero();
-  update_Hhat();
-  compute_effective_kappa();
-  compute_uc_forces(Fs);
 
   for (int index = 0; index < nuc_beads.size(); index++)
     Fs.col(nuc_beads[index]) += -dFdX_i[index];  
 
   
-  
-  compute_tension({0,0,0},{0,0,0},Fs);
-  
-  int iterations = correct_tension(xs,Fs,dt,xs.col(0),
-				   xs.col(Nbeads-1),
-				   itermax,1e-8);
-
+  int iterations = second_step(xs,Fs,dt,itermax);
 
 
   if (iterations > itermax) {
@@ -95,17 +78,7 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
     std::cout << "too many iterations when correcting tension at time " << t
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
-
-    for (int i = 0; i < get_Nbeads(); i++) 
-      xs.col(i) = tmp_xs.col(i);
-
-    compute_tangents_and_friction(xs);
-    
     return single_step(xs,Fs,t,dt,dFdX_i,itermax,numtries,throw_exception);
-  }  else {
-    final_integrate(xs,Fs,dt,3,DOUBLE);
-  
-    compute_tangents_and_friction(xs);
   }
 
   return 0;
@@ -134,6 +107,39 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   }
 
   Fs.setZero();
+  for (int index = 0; index < nuc_beads.size(); index++)
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+
+
+  
+  first_step(xs,Fs,dt,dX0dt(t+dt/2),dXNdt(t+dt/2));
+
+  Fs.setZero();
+  for (int index = 0; index < nuc_beads.size(); index++)
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+  
+  int iterations = second_step(xs,Fs,dt,itermax,X0_t(t+dt),dX0dt(t+dt),
+			       XN_t(t+dt),dXNdt(t+dt));
+
+  if (iterations > itermax) {
+    numtries -= 1;
+    std::cout << "too many iterations when correcting tension at time " << t
+	      <<  ", retrying the step with new noise ( " << numtries 
+	      << " attempts left). " << std::endl;
+    return single_step(xs,Fs,t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
+  }
+  return 0;
+}
+
+
+
+/* ============================================================================ */
+/* Initial integration step. The force vector Fs needs to have been set (either
+   by particle-particle interactions or set to zero). */
+/* ============================================================================ */
+void DoubleTether::first_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			      Eigen::Ref<Eigen::Matrix3Xd> Fs,double dt)
+{
   set_unprojected_noise(dt);
   update_G();
   update_Hhat();
@@ -141,50 +147,93 @@ int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   compute_effective_kappa();
   compute_uc_forces(Fs);
   
-  for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
-
-
-  
-  compute_tension(dX0dt(t+dt/2),dXNdt(t+dt/2),Fs);
+  compute_tension({0,0,0},{0,0,0},Fs);
   initial_integrate(xs,Fs,dt,3,DOUBLE);
-  
 
-  Fs.setZero();
+}
+
+/* ============================================================================ */
+/* Initial integration step. The force vector Fs needs to have been set (either
+   by particle-particle interactions or set to zero). */
+/* ============================================================================ */
+void DoubleTether::first_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			      Eigen::Ref<Eigen::Matrix3Xd> Fs,double dt,
+			      const Eigen::Ref<const Eigen::Vector3d> &dX0dt,
+			      const Eigen::Ref<const Eigen::Vector3d> & dXNdt )
+{
+  set_unprojected_noise(dt);
+  update_G();
+  update_Hhat();
+  compute_noise();
+  compute_effective_kappa();
+  compute_uc_forces(Fs);
+  
+  compute_tension(dX0dt,dXNdt,Fs);
+  initial_integrate(xs,Fs,dt,3,DOUBLE);
+
+}
+
+
+/* ============================================================================ */
+/* Second integration step. The force vector Fs needs to have been set (either
+   by particle-particle interactions or set to zero). */
+/* ============================================================================ */
+int DoubleTether::second_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			      Eigen::Ref<Eigen::Matrix3Xd> Fs,
+			      double dt,int itermax)
+{
   update_Hhat();
   compute_effective_kappa();
   compute_uc_forces(Fs);
-
-  for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
-
   
-  
-  compute_tension(dX0dt(t+dt),dXNdt(t+dt),Fs);
-  
-  int iterations = correct_tension(xs,Fs,dt,X0_t(t+dt),XN_t(t+dt),
-				   itermax,1e-8);
+  compute_tension({0,0,0},{0,0,0},Fs);
 
+  int iterations = correct_tension(xs,Fs,dt,xs.col(0),xs.col(Nbeads-1),itermax,1e-8);
+
+  if (iterations > itermax) {
+    for (int i = 0; i < get_Nbeads(); i++) 
+      xs.col(i) = tmp_xs.col(i);
+  } else {
+    final_integrate(xs,Fs,dt,3,DOUBLE);
+  }
+  compute_tangents_and_friction(xs);
+  
+  return iterations;
+}
+
+
+/* ============================================================================ */
+/* Second integration step. The force vector Fs needs to have been set (either
+   by particle-particle interactions or set to zero). */
+/* ============================================================================ */
+int DoubleTether::second_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			      Eigen::Ref<Eigen::Matrix3Xd> Fs,
+			      double dt,int itermax,
+			      const Eigen::Ref<const Eigen::Vector3d> &X0_tFull,
+			      const Eigen::Ref<const Eigen::Vector3d> &dX0dtHalf,
+			      const Eigen::Ref<const Eigen::Vector3d> & XN_tFull,
+			      const Eigen::Ref<const Eigen::Vector3d> & dXNdtHalf)
+{
+  update_Hhat();
+  compute_effective_kappa();
+  compute_uc_forces(Fs);
+  
+  compute_tension(dX0dtHalf,dXNdtHalf,Fs);
+
+  int iterations = correct_tension(xs,Fs,dt,X0_tFull,XN_tFull,itermax,1e-8);
 
 
   if (iterations > itermax) {
-    numtries -= 1;
-    std::cout << "too many iterations when correcting tension at time " << t
-	      <<  ", retrying the step with new noise ( " << numtries 
-	      << " attempts left). " << std::endl;
     for (int i = 0; i < get_Nbeads(); i++) 
       xs.col(i) = tmp_xs.col(i);
-
-    compute_tangents_and_friction(xs);
-    return single_step(xs,Fs,t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
-  }  else {
+  } else {
     final_integrate(xs,Fs,dt,3,DOUBLE);
-  
-    compute_tangents_and_friction(xs);
   }
-
-  return 0;
+  compute_tangents_and_friction(xs);
+  
+  return iterations;
 }
+
 
 
 /* ---------------------------------------------------------------------------- */

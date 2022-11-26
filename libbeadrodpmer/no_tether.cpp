@@ -59,6 +59,7 @@ void NoTether::setup(const Eigen::Ref<const Eigen::Matrix3Xd> &xs) {
   set_dCdlambda();
 }
 
+  
 int NoTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
 			  Eigen::Ref<Eigen::Matrix3Xd> Fs,double t, double dt,
 			  const std::vector<Eigen::Vector3d> & dFdX_i,
@@ -75,47 +76,24 @@ int NoTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   }
 
   Fs.setZero();
-  set_unprojected_noise(dt);
-  update_G(0);
-  update_Hhat(0);
-  compute_noise();
-  compute_effective_kappa();
-  compute_uc_forces(Fs);
-
   for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];
   
-  compute_tension(Fs);
-  initial_integrate(xs,Fs,dt,0,NONE);
-  
+  first_step(xs,Fs,dt);
+
 
   Fs.setZero();
-  update_Hhat(0);
-  compute_effective_kappa();
-  compute_uc_forces(Fs);
-
   for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
+    Fs.col(nuc_beads[index]) += -dFdX_i[index];
   
-  compute_tension(Fs);
-
-  
-  int iterations = correct_tension(xs,Fs,dt,itermax,1e-8);
+  int iterations = second_step(xs,Fs,dt,itermax);
 
   if (iterations > itermax) {
     numtries -= 1;
     std::cout << "too many iterations when correcting tension at time " << t
 	      <<  ", retrying the step with new noise ( " << numtries 
 	      << " attempts left). " << std::endl;
-    for (int i = 0; i < get_Nbeads(); i++) 
-      xs.col(i) = tmp_xs.col(i);
-
-    compute_tangents_and_friction(xs);
     return single_step(xs,Fs,t,dt,dFdX_i,itermax,numtries,throw_exception);
-  } else {
-    final_integrate(xs,Fs,dt,0,NONE);
-  
-    compute_tangents_and_friction(xs);
   }
 
   return 0;
@@ -123,6 +101,56 @@ int NoTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
 
 
+/* ============================================================================ */
+/* Initial integration step. The force vector Fs needs to have been set (either
+   by particle-particle interactions or set to zero). */
+/* ============================================================================ */
+void NoTether::first_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			  Eigen::Ref<Eigen::Matrix3Xd> Fs,double dt)
+{
+  set_unprojected_noise(dt);
+  update_G(0);
+  update_Hhat(0);
+  compute_noise();
+  compute_effective_kappa();
+  compute_uc_forces(Fs);
+  
+  compute_tension(Fs);
+  initial_integrate(xs,Fs,dt,0,NONE);
+
+}
+
+
+/* ============================================================================ */
+/* Second integration step. The force vector Fs needs to have been set (either
+   by particle-particle interactions or set to zero). */
+/* ============================================================================ */
+int NoTether::second_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			  Eigen::Ref<Eigen::Matrix3Xd> Fs,
+			  double dt,int itermax)
+{
+  update_Hhat(0);
+  compute_effective_kappa();
+  compute_uc_forces(Fs);
+  
+  compute_tension(Fs);
+
+  int iterations = correct_tension(xs,Fs,dt,itermax,1e-8);
+
+
+  if (iterations > itermax) {
+    for (int i = 0; i < get_Nbeads(); i++) 
+      xs.col(i) = tmp_xs.col(i);
+  } else {
+    final_integrate(xs,Fs,dt,0,NONE);
+  }
+  compute_tangents_and_friction(xs);
+  
+  return iterations;
+}
+
+
+  
 
 /* -------------------------------------------------------------------------- */
 /* Compute forces on the particles. */

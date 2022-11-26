@@ -19,6 +19,24 @@ public:
 			  int itermax = 20, int numtries = 5,
 			  bool throw_exception=true) override;
 
+
+  virtual void first_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double) override;
+
+  virtual int second_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double,int) override;
+
+
+
+  void first_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double,
+			  const Eigen::Ref<const Eigen::Vector3d> &);
+
+  int second_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double,int,
+			  const Eigen::Ref<const Eigen::Vector3d> &,
+			  const Eigen::Ref<const Eigen::Vector3d> &);
+
   
   int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
 		  Eigen::Ref<Eigen::Matrix3Xd>,double,double,

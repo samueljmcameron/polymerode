@@ -21,6 +21,12 @@ public:
 
   virtual void setup(const Eigen::Ref<const Eigen::Matrix3Xd> &) override;
 
+  virtual void first_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double) override;
+
+  virtual int second_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double,int) override;
+
   
   void test_jacob(int,double) ;
 

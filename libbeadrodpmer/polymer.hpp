@@ -60,7 +60,13 @@ class Polymer {
 
   virtual void setup(const Eigen::Ref<const Eigen::Matrix3Xd> &) = 0;
 
+  virtual void first_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double) = 0;
 
+  virtual int second_step(Eigen::Ref<Eigen::Matrix3Xd> ,
+			  Eigen::Ref<Eigen::Matrix3Xd> ,double,int) = 0;
+
+  
   Eigen::VectorXd constraint_errors;
   
   void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd>);
