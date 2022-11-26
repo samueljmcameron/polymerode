@@ -145,7 +145,7 @@ int SingleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   compute_tension(dX0dt(t+dt/2),Fs);
   initial_integrate(xs,Fs,dt,3,SINGLE);
   
-
+  Fs.setZero();
   update_Hhat();
   compute_effective_kappa();
   compute_uc_forces(Fs);
