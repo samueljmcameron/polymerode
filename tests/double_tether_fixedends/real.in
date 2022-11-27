@@ -1,0 +1,12 @@
+# set global parameters
+
+molecules    1
+steps        1000
+timestep     1e-3
+dump_every   1000
+
+dump_file    molnew.trj
+
+# set polymer parameters
+
+double_tether beads 100 bondlength 2.0 zeta_para 0.5 zeta_perp 1.0 temp 4.114 bending 206.0 x0 -15.0 -20.0 0.0 xN 15.0 20.0 0.0 seed 712049 init_ends 100 1e-3 0.1 10000
