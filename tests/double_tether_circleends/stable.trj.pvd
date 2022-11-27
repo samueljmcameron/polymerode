@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<VTKFile type="Collection"  version="1.0" byte_order="LittleEndian">
+<Collection>
+<DataSet timestep="0" group="" part="0" file="mol.trj_0.vtp"/>
+<DataSet timestep="0.1" group="" part="0" file="mol.trj_100.vtp"/>
+<DataSet timestep="0.2" group="" part="0" file="mol.trj_200.vtp"/>
+<DataSet timestep="0.3" group="" part="0" file="mol.trj_300.vtp"/>
+<DataSet timestep="0.4" group="" part="0" file="mol.trj_400.vtp"/>
+<DataSet timestep="0.5" group="" part="0" file="mol.trj_500.vtp"/>
+<DataSet timestep="0.6" group="" part="0" file="mol.trj_600.vtp"/>
+<DataSet timestep="0.7" group="" part="0" file="mol.trj_700.vtp"/>
+<DataSet timestep="0.8" group="" part="0" file="mol.trj_800.vtp"/>
+<DataSet timestep="0.9" group="" part="0" file="mol.trj_900.vtp"/>
+<DataSet timestep="1" group="" part="0" file="mol.trj_1000.vtp"/>
+</Collection>
+</VTKFile>
