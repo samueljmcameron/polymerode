@@ -24,6 +24,8 @@ int main(int argc, char* argv[])
 
   std::string simulation_type = "run";
 
+  std::string endtype = "none";
+
   int iarg = 1;  
   while(iarg < argc) {
     if (strcmp(argv[iarg],"-in") == 0) {
@@ -47,6 +49,10 @@ int main(int argc, char* argv[])
     } else if (strcmp(argv[iarg],"-testnoise") == 0) {
       simulation_type = "test";
       iarg += 1;
+
+    } else if (strcmp(argv[iarg],"-endtype") == 0) {
+      endtype = argv[iarg+1];
+      iarg += 2;
     } else {
       std::cerr << "Error: invalid command line variable specification."
 		<< std::endl;
@@ -97,7 +103,7 @@ int main(int argc, char* argv[])
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;
-      run(gp,pmer);
+      run(gp,pmer,endtype);
       std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
       std::cout << "Run time = "
 		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
@@ -108,13 +114,16 @@ int main(int argc, char* argv[])
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     
       std::cout << "Running simulation of polymer." << std::endl;
-      run(gp,pmer);
+      run(gp,pmer,endtype);
       std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
       std::cout << "Run time = "
 		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
 		<< "seconds." << std::endl;  
       
     } else if (polymertype == "no_tether") {
+      if (endtype != "none")
+	throw std::runtime_error("Cannot pass -endtype argument to no_tether input script.");
+      
       BeadRodPmer::NoTether pmer(splitvec);
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     

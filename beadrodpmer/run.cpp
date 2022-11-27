@@ -53,7 +53,8 @@ public:
 
 
 
-void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
+void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer,
+	 std::string endtype)
 {
 
   // making the arrays too big to demonstrate that there is minimal slow down
@@ -77,6 +78,7 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
   double t = 0;
 
   movingEnds move(0.1,100,xs.middleCols(offset,Nbeads).col(0),xs.middleCols(offset,Nbeads).col(pmer.get_Nbeads()-1));
+
 
   auto X0_t = std::bind(&movingEnds::X0_t,&move,std::placeholders::_1);
   auto XN_t = std::bind(&movingEnds::XN_t,&move,std::placeholders::_1);
@@ -102,7 +104,14 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
 
   pmer.setup(xs.middleCols(offset,Nbeads));
 
-  pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
+  if (endtype == "circle") 
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,
+		     X0_t,XN_t,dX0dt,dXNdt);
+  else if (endtype == "fixed")
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is);
+  else
+    throw std::runtime_error("incorrect endtype provided (must be either circle or fixed).");
+
   t += dt;
 
   if (dump_every == 1) {
@@ -119,8 +128,14 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
   // continue the remaining numstep - 2 steps
   for (int i = 2; i <= numsteps; i++) {
 
+    if (endtype == "circle") 
+      pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,
+		       X0_t,XN_t,dX0dt,dXNdt);
+    else if (endtype == "fixed")
+      pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is);
+    else
+      throw std::runtime_error("incorrect endtype provided (must be either circle or fixed).");
 
-    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,XN_t,dX0dt,dXNdt);
     t += dt;
     if (i % dump_every == 0) {
       fname = gp.dump_file + std::string("_") + std::to_string(i) + std::string(".vtp");
@@ -140,9 +155,8 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer)
   return;
 }
 
-
-
-void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
+void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer,
+	 std::string endtype)
 {
 
   // making the arrays too big to demonstrate that there is minimal slow down
@@ -191,7 +205,15 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
 
   pmer.setup(xs.middleCols(offset,Nbeads));
-  pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,dX0dt);
+
+  if (endtype == "circle") 
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,
+		     X0_t,dX0dt);
+  else if (endtype == "fixed")
+    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is);
+  else
+    throw std::runtime_error("incorrect endtype provided (must be either circle or fixed).");
+
   t += dt;
 
   if (dump_every == 1) {
@@ -209,7 +231,14 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
   for (int i = 2; i <= numsteps; i++) {
 
 
-    pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,X0_t,dX0dt);
+    if (endtype == "circle") 
+      pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is,
+		       X0_t,dX0dt);
+    else if (endtype == "fixed")
+      pmer.single_step(xs.middleCols(offset,Nbeads),Fs.middleCols(offset,Nbeads),t,dt,dFdX_is);
+    else
+      throw std::runtime_error("incorrect endtype provided (must be either circle or fixed).");
+
     t += dt;
 
     if (i % dump_every == 0) {
@@ -230,6 +259,8 @@ void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer)
 
   return;
 }
+
+
 
 void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer)
 {
