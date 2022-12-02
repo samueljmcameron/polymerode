@@ -18,7 +18,7 @@ else()
 endif()
 
 
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Eigen3 3.4 REQUIRED NO_MODULE)
 
 
 add_subdirectory(libbeadrodpmer)
