@@ -12,7 +12,8 @@ namespace BeadRodPmer {
 /* Simple function to write a vtk file with binary data. */
 
 void ioVTK::writeVTKPolyData(std::string fname,
-			     const Eigen::Ref<Eigen::Matrix3Xd> xs)
+			     const Eigen::Ref<Eigen::Matrix3Xd> xs,
+			     bool connect_atoms)
 /*============================================================================*/
 /*
   Write scalar image data to a vtk (and paraview) compatible file
@@ -52,19 +53,22 @@ void ioVTK::writeVTKPolyData(std::string fname,
     
   }
   myfile << std::endl << "</DataArray>" << std::endl
-	 << "</Points>" << std::endl
-	 << "<Lines>" << std::endl
-	 << "<DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">"
-	 << std::endl;
+	 << "</Points>" << std::endl;
 
-  for (int i = 0; i < xs.cols(); i++) 
-    myfile << i << " ";
-  myfile << std::endl << "</DataArray>" << std::endl
-	 << "<DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">"
-	 << std::endl << xs.cols() << std::endl
-	 << "</DataArray>" << std::endl
-    	 << "</Lines>" << std::endl
-	 << "</Piece>" << std::endl
+  if (connect_atoms) {
+	myfile << "<Lines>" << std::endl
+	       << "<DataArray type=\"Int64\" Name=\"connectivity\" format=\"ascii\">"
+	       << std::endl;
+
+	for (int i = 0; i < xs.cols(); i++) 
+	  myfile << i << " ";
+	myfile << std::endl << "</DataArray>" << std::endl
+	       << "<DataArray type=\"Int64\" Name=\"offsets\" format=\"ascii\">"
+	       << std::endl << xs.cols() << std::endl
+	       << "</DataArray>" << std::endl
+	       << "</Lines>" << std::endl;
+  }
+  myfile << "</Piece>" << std::endl
 	 << "</PolyData>" << std::endl
 	 << "</VTKFile>" << std::endl;    
   myfile.close();

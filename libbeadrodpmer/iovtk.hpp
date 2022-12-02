@@ -10,7 +10,8 @@ namespace BeadRodPmer {
 namespace ioVTK {
 
 
-  void writeVTKPolyData(std::string,const Eigen::Ref<Eigen::Matrix3Xd>);
+  void writeVTKPolyData(std::string,const Eigen::Ref<Eigen::Matrix3Xd>,
+			bool connect_atoms=true);
 
   void readVTKPolyData(Eigen::Ref<Eigen::Matrix3Xd>, std::string);
   
