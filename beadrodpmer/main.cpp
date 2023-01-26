@@ -1,9 +1,17 @@
 
 #include "BeadRodPmerConfig.h"
-#include "globalparams.hpp"
+
 #include "input.hpp"
+#include "polymer.hpp"
+#include "no_tether.hpp"
+#include "single_tether.hpp"
+#include "double_tether.hpp"
+#include "initialise.hpp"
+
+
 #include "run.hpp"
 
+#include <memory>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -23,8 +31,6 @@ int main(int argc, char* argv[])
   std::map<std::string,std::string> variables;
 
   std::string simulation_type = "run";
-
-  std::string endtype = "none";
 
   int iarg = 1;  
   while(iarg < argc) {
@@ -50,98 +56,152 @@ int main(int argc, char* argv[])
       simulation_type = "test";
       iarg += 1;
 
-    } else if (strcmp(argv[iarg],"-endtype") == 0) {
+    }/* else if (strcmp(argv[iarg],"-endtype") == 0) {
       endtype = argv[iarg+1];
       iarg += 2;
-    } else {
+      } */
+    else {
       std::cerr << "Error: invalid command line variable specification."
 		<< std::endl;
       return EXIT_FAILURE;
     }
   }
 
+
+  std::unique_ptr<BeadRodPmer::Polymer> pmer;
+  
   
   if (not infile.is_open()) {
     std::cerr << "Error: need to specify input file." << std::endl;
     return EXIT_FAILURE;
-  }
+  };
 
+  
   std::string line;
-  std::vector<std::string> splitvec;
-    
-  BeadRodPmer::GlobalParams gp(infile,variables,line);
-
-  line = line.substr(0,line.find_first_of("#"));
-  splitvec = BeadRodPmer::input::split_line(line);
+  std::vector<std::string> v_line;
   
-
-  while (std::getline(infile,line) &&
-	 splitvec[0] != "double_tether" && splitvec[0] != "single_tether"
-	  && splitvec[0] != "no_tether") {
-
-    line = line.substr(0,line.find_first_of("#"));
-    splitvec = BeadRodPmer::input::split_line(line);
+  std::string polymertype;
+  while (std::getline(infile,line)) {
+    
+    if (line == "" || line[0] == '#') continue;
+    
+    input::convertVariable(line,variables);
+    
+    v_line = input::split_line(line);
+    
+    polymertype = v_line[0];
+    v_line.erase(v_line.begin());
+    
+    if (polymertype == "double_tether") {
+      pmer = std::make_unique<BeadRodPmer::DoubleTether>(v_line);
+    } else if (polymertype == "single_tether") {
+      pmer = std::make_unique<BeadRodPmer::SingleTether>(v_line);	
+    } else if (polymertype == "no_tether") {
+      pmer = std::make_unique<BeadRodPmer::NoTether>(v_line);
+    } else {
+      std::cerr << "Error: Incorrect polymer type." << std::endl;
+      return EXIT_FAILURE;
+    }
+    
+    break;
     
   }
 
-  std::string polymertype = splitvec.at(0);
-
-  splitvec.erase(splitvec.begin());
+  Eigen::Matrix3Xd xs(3,pmer->get_Nbeads());
 
 
 
-  for (auto &c : splitvec)
-    BeadRodPmer::input::convertVariable(c,variables);
+  while (std::getline(infile,line)) {
+    
+    if (line == "" || line[0] == '#') continue;
+    
+    input::convertVariable(line,variables);
+    
+    v_line = input::split_line(line);
 
+    if (v_line[0] != "initialise") {
+      std::cerr << " Invalid argument in input file" << std::endl;
+      return EXIT_FAILURE;
+    }
 
+    v_line.erase(v_line.begin());
 
+    // initialise the xs vector (doing some unnecessary but illustrative slicing)
+    BeadRodPmer::Initialise::init_atoms_relaxed_caret(v_line,*pmer,
+						      xs.middleCols(0,pmer->get_Nbeads()));
 
+    break;
+  }
   
-  if (simulation_type == "run") {
-    if (polymertype == "double_tether") {
-      BeadRodPmer::DoubleTether pmer(splitvec);
-      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+  double dt;
+  std::string dump_fname;
+  int dump_every;
+
+  int count = 0; // count that all arguments are included
+  while (std::getline(infile,line)) {
     
-      std::cout << "Running simulation of polymer." << std::endl;
-      run(gp,pmer,endtype);
+    if (line == "" || line[0] == '#') continue;
+    
+    input::convertVariable(line,variables);
+    
+    v_line = input::split_line(line);
+
+    if (v_line.size() != 2) {
+      std::cerr << " Invalid argument in input file" << std::endl;
+      return EXIT_FAILURE;
+    }
+  
+    if (v_line[0] == "timestep") {
+      dt = std::stod(v_line[1]);
+      count += 1;
+    } else if (v_line[0] == "dump_file") {
+      dump_fname = v_line[1];
+      count += 1;
+    } else if (v_line[0] == "dump_every") {
+      dump_every = std::stoi(v_line[1]);
+      count += 1;
+    } else {
+      std::cerr << " Invalid argument in input file" << std::endl;
+      return EXIT_FAILURE;
+    }
+    if (count == 3) break;
+  }
+
+
+  while (std::getline(infile,line)) {
+
+    if (line == "" || line[0] == '#') continue;
+    
+    input::convertVariable(line,variables);
+    
+    v_line = input::split_line(line);
+
+    if (v_line.size() != 2) {
+      std::cerr << " Invalid argument in input file" << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    if (v_line[0] == "run") {
+      int numsteps = std::stoi(v_line[1]);
+      std::cout << "Running simulation of " << polymertype << " polymer." << std::endl;
+
+      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+      run(*pmer,xs,std::stoi(v_line[1]),dt,dump_fname,dump_every);
+
       std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
       std::cout << "Run time = "
 		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
 		<< "seconds." << std::endl;  
- 
-    } else if (polymertype == "single_tether") {
-      BeadRodPmer::SingleTether pmer(splitvec);
-      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    
-      std::cout << "Running simulation of polymer." << std::endl;
-      run(gp,pmer,endtype);
-      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-      std::cout << "Run time = "
-		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
-		<< "seconds." << std::endl;  
-      
-    } else if (polymertype == "no_tether") {
-      if (endtype != "none")
-	throw std::runtime_error("Cannot pass -endtype argument to no_tether input script.");
-      
-      BeadRodPmer::NoTether pmer(splitvec);
-      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    
-      std::cout << "Running simulation of polymer." << std::endl;
-      run(gp,pmer);
-      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-      std::cout << "Run time = "
-		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
-		<< "seconds." << std::endl;  
+
       
     } else {
-      std::cout << "Error, simulation keyword must be either single_tether, no_tether, "
-		<< "or double_tether, not " << polymertype << "." << std::endl;
+      std::cerr << " Invalid argument in input file" << std::endl;
     }
-  } else if (simulation_type == "test") {
-    std::cout << "Testing simulation of polymer." << std::endl;
-    //    test_noise(gp,pmer);
+    break;
+
   }
+    
 
   return 0;
   

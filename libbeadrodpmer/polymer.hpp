@@ -8,7 +8,6 @@
 #include <vector>
 #include <string>
 #include <random>
-#include <functional>
 
 namespace BeadRodPmer {
 typedef Eigen::SparseMatrix<double> SpMat; // declares column-major
@@ -33,29 +32,9 @@ class Polymer {
   double get_zpara() const;
   double get_zperp() const;
   double get_bondlength() const;
+  double get_bending() const;
+  int get_seed() const;
   double get_timescale(double) const;
-
-  Eigen::Vector3d get_x0() const;
-  Eigen::Vector3d get_xN() const;
-
-  std::vector<int> nuc_beads;
-  std::vector<double> nuc_strengths;
-  std::vector<double> nuc_maxs;
-  std::vector<double> nuc_widths;
-
-
-
-  int equilibration_steps;
-  double initspringK;   // spring constant for initializing double tether
-  double initdt;        // time step for initializing double tether
-  double inittolerance; // how far from specified tether is acceptable when
-
-
-  virtual int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
-			  Eigen::Ref<Eigen::Matrix3Xd>,double, double,
-			  const std::vector<Eigen::Vector3d> &,
-			  int, int , bool ) = 0;
-
 
 
   virtual void setup(const Eigen::Ref<const Eigen::Matrix3Xd> &) = 0;
@@ -69,10 +48,6 @@ class Polymer {
   
   Eigen::VectorXd constraint_errors;
   
-  void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd>);
-  void init_atoms_line(Eigen::Ref<Eigen::Matrix3Xd>);
-  void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd>);
-  
 protected:
   int Nbeads;           // number of polymer beads
   double bondlength;    // length of rods connecting beads
@@ -83,14 +58,6 @@ protected:
 
 
   Eigen::VectorXd costhetas; // costhetas[i] = u[i+2].u[i+1]
-
-  
-
-                                  //  initializing double tether
-  
-  Eigen::Vector3d x0,xN;         // desired location of tethered beads
-
-  bool flag_x0, flag_xN, flag_initdoubleteth;
 
   std::mt19937 gen;
 
@@ -113,6 +80,7 @@ protected:
 
 private:
 
+  int seed;
   void resize(int Nbeads) {
     t_forces.resize(Eigen::NoChange,Nbeads);
     noises.resize(Eigen::NoChange,Nbeads);

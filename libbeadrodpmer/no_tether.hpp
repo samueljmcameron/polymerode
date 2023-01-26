@@ -12,13 +12,6 @@ public:
   // constructor
   NoTether(const std::vector<std::string> &);
 
-  virtual int single_step(Eigen::Ref<Eigen::Matrix3Xd>,
-			  Eigen::Ref<Eigen::Matrix3Xd>,double, double,
-			  const std::vector<Eigen::Vector3d> &,
-			  int itermax = 20, int numtries = 5,
-			  bool throw_exception=true) override ;
-
-
   virtual void setup(const Eigen::Ref<const Eigen::Matrix3Xd> &) override;
 
   virtual void first_step(Eigen::Ref<Eigen::Matrix3Xd> ,
@@ -30,10 +23,6 @@ public:
   
   void test_jacob(int,double) ;
 
-  NoTether make_NoTether() const {
-    NoTether nt(_splitvec);
-    return nt;
-  }
   
 protected:
 
@@ -127,8 +116,6 @@ private:
   double dCdlambda_upperoff_val(int);
 
   Eigen::Matrix3Xd tmp_bonds;
-
-  std::vector<std::string> _splitvec;
  
   
 };

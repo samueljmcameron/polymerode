@@ -1,5 +1,5 @@
-#ifndef BEADRODPMER_IOVTK_HPP
-#define BEADRODPMER_IOVTK_HPP
+#ifndef IOVTK_HPP
+#define IOVTK_HPP
 
 #include <string>
 #include <vector>
@@ -23,6 +23,5 @@ namespace ioVTK {
   
 }
 
-};
-
+}
 #endif

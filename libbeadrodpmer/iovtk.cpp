@@ -7,10 +7,10 @@
 
 #include "iovtk.hpp"
 
-namespace BeadRodPmer {
 
 /* Simple function to write a vtk file with binary data. */
 
+namespace BeadRodPmer {
 void ioVTK::writeVTKPolyData(std::string fname,
 			     const Eigen::Ref<Eigen::Matrix3Xd> xs,
 			     bool connect_atoms)

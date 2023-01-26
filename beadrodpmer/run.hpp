@@ -2,16 +2,11 @@
 #define RUN_HPP
 
 #include <string>
+#include <Eigen/Core>
 
-#include "globalparams.hpp"
-#include "double_tether.hpp"
-#include "single_tether.hpp"
-#include "no_tether.hpp"
+#include "polymer.hpp"
 
-void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::DoubleTether& pmer,
-	 std::string endtype);
-void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::SingleTether& pmer,
-	 std::string endtype);
-void run(BeadRodPmer::GlobalParams& gp, BeadRodPmer::NoTether& pmer);
+void run(BeadRodPmer::Polymer & ,Eigen::Ref<Eigen::Matrix3Xd> ,
+	 int ,double , std::string , int );
 
 #endif

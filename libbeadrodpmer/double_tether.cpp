@@ -1,6 +1,4 @@
 #include "double_tether.hpp"
-#include "input.hpp"
-#include "initialise.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -11,8 +9,8 @@ using namespace BeadRodPmer;
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
-  : SingleTether(splitvec)
+DoubleTether::DoubleTether(const std::vector<std::string> & v_line)
+  : SingleTether(v_line)
 {
   
   rhs_of_G.resize(Nbeads+5);
@@ -39,98 +37,6 @@ DoubleTether::DoubleTether(const std::vector<std::string> & splitvec)
   bDets.resize(Nbeads+3);
 
 }
-
-int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
-			      Eigen::Ref<Eigen::Matrix3Xd> Fs,
-			      double t, double dt,
-			      const std::vector<Eigen::Vector3d> &dFdX_i,
-			      int itermax, int numtries,bool throw_exception)
-{
-
-  // get here if this step has been restarted numtry times
-  if (numtries == 0) {
-    if (throw_exception) 
-      throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
-    else 
-      return -1;
-  }
-
-  Fs.setZero();
-  
-  for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
-
-
-  
-  first_step(xs,Fs,dt);
-
-  Fs.setZero();
-
-  for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
-
-  
-  int iterations = second_step(xs,Fs,dt,itermax);
-
-
-  if (iterations > itermax) {
-    numtries -= 1;
-    std::cout << "too many iterations when correcting tension at time " << t
-	      <<  ", retrying the step with new noise ( " << numtries 
-	      << " attempts left). " << std::endl;
-    return single_step(xs,Fs,t,dt,dFdX_i,itermax,numtries,throw_exception);
-  }
-
-  return 0;
-  
-
-}
-
-
-int DoubleTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
-			      Eigen::Ref<Eigen::Matrix3Xd> Fs,
-			      double t,double dt,
-			      const std::vector<Eigen::Vector3d> & dFdX_i,
-			      std::function<Eigen::Vector3d (double)> X0_t,
-			      std::function<Eigen::Vector3d (double)> XN_t,
-			      std::function<Eigen::Vector3d (double)> dX0dt,
-			      std::function<Eigen::Vector3d (double)> dXNdt,
-			      int itermax, int numtries,bool throw_exception)
-{
-
-  // get here if this step has been restarted numtry times
-  if (numtries == 0) {
-    if (throw_exception)
-      throw std::runtime_error("could not solve constraint equation for double tethered polymer.");
-    else 
-      return -1;
-  }
-
-  Fs.setZero();
-  for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
-
-
-  
-  first_step(xs,Fs,dt,dX0dt(t+dt/2),dXNdt(t+dt/2));
-
-  Fs.setZero();
-  for (int index = 0; index < nuc_beads.size(); index++)
-    Fs.col(nuc_beads[index]) += -dFdX_i[index];  
-  
-  int iterations = second_step(xs,Fs,dt,itermax,X0_t(t+dt),dX0dt(t+dt),
-			       XN_t(t+dt),dXNdt(t+dt));
-
-  if (iterations > itermax) {
-    numtries -= 1;
-    std::cout << "too many iterations when correcting tension at time " << t
-	      <<  ", retrying the step with new noise ( " << numtries 
-	      << " attempts left). " << std::endl;
-    return single_step(xs,Fs,t,dt,dFdX_i,X0_t,XN_t,dX0dt,dXNdt,itermax,numtries,throw_exception);
-  }
-  return 0;
-}
-
 
 
 /* ============================================================================ */

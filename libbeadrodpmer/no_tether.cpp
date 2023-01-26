@@ -1,5 +1,4 @@
 #include "no_tether.hpp"
-#include "input.hpp"
 
 #include <iostream>
 #include <cmath>
@@ -11,10 +10,10 @@ namespace BeadRodPmer {
 /* -------------------------------------------------------------------------- */
 /* Constructor */
 /* -------------------------------------------------------------------------- */
-NoTether::NoTether(const std::vector<std::string> & splitvec)
-  : Polymer(splitvec),Gmunu_solver(new Eigen::SimplicialLDLT< SpMat, Eigen::Lower >),
+NoTether::NoTether(const std::vector<std::string> & v_line)
+  : Polymer(v_line),Gmunu_solver(new Eigen::SimplicialLDLT< SpMat, Eigen::Lower >),
     Hhat_solver (new Eigen::SimplicialLDLT< SpMat, Eigen::Lower >),
-    jacob_solver( new Eigen::SparseLU< SpMat >),_splitvec(splitvec)
+    jacob_solver( new Eigen::SparseLU< SpMat >)
 {
 
   rhs_of_G.resize(Nbeads-1);
@@ -58,8 +57,9 @@ void NoTether::setup(const Eigen::Ref<const Eigen::Matrix3Xd> &xs) {
   set_Hhat();
   set_dCdlambda();
 }
+  /* This function is outdated, only works when no force is applied. Leaving here for now
+     as reminder of what a full step would look like. 
 
-  
 int NoTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
 			  Eigen::Ref<Eigen::Matrix3Xd> Fs,double t, double dt,
 			  const std::vector<Eigen::Vector3d> & dFdX_i,
@@ -99,7 +99,7 @@ int NoTether::single_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   return 0;
 }
 
-
+  */
 
 /* ============================================================================ */
 /* Initial integration step. The force vector Fs needs to have been set (either
@@ -765,8 +765,6 @@ void NoTether::calculate_constraint_errors(int offset,
   return;
   
 }
-
-
 
 /* -------------------------------------------------------------------------- */
 /* Initialse G in G*eta = P (only call once). */
