@@ -2,14 +2,15 @@
 
 double_tether beads 100 bondlength 2.0 zeta_para 0.5 zeta_perp 1.0 bending 206.0 temp 4.114 seed 3489120
 
-initialise x0 -15.0 -20.0 0.0 xN 15.0 20.0 0.0 springK 100 dt 1e-3 nsteps 10000 tol 0.1 itermax 20 seed 712049
+# old seed was 712049
+initialise x1 -35.0 -35.0 -35.0 xN 35.0 35.0 35.0 springK 100 dt 1e-3 nsteps 100000 tol 0.1 itermax 20 seed ${seed} equilibrium
 
 
 timestep     1e-3
 
 
-dump_file    data/mol.trj
+dump_file    data/initial
 dump_every   100
 
 
-run 10000
+run 0

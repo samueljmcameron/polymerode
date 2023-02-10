@@ -1,8 +1,9 @@
 
 #include <random>
 #include <exception>
-
+#include <Eigen/Dense>
 #include "no_tether.hpp"
+#include <iostream>
 
 #include "initialise.hpp"
 
@@ -23,7 +24,7 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
 
 
 
-  Eigen::Vector3d x0,xN;
+  Eigen::Vector3d x1,xN;
 
   double springK,dt,tol;
   int seed;
@@ -31,14 +32,14 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
 
 
   // read in input from istr
-  if (v_istr.size() != 20)
+  if (v_istr.size() != 21)
     throw std::invalid_argument("incorrect number of arguments for polymer initialisation.");
   
-  if (v_istr[0] != "x0")
-    throw std::invalid_argument("missing x0 argument for polymer initialisation.");
-  x0(0) = std::stod(v_istr[1]);
-  x0(1) = std::stod(v_istr[2]);
-  x0(2) = std::stod(v_istr[3]);
+  if (v_istr[0] != "x1")
+    throw std::invalid_argument("missing x1 argument for polymer initialisation.");
+  x1(0) = std::stod(v_istr[1]);
+  x1(1) = std::stod(v_istr[2]);
+  x1(2) = std::stod(v_istr[3]);
 
   if (v_istr[4] != "xN")
     throw std::invalid_argument("missing xN argument for polymer initialisation.");
@@ -71,6 +72,7 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
   if (v_istr[18] != "seed")
     throw std::invalid_argument("missing tol argument for polymer initialisation.");
   seed = std::stoi(v_istr[19]);
+
   
   
   // transfer arguments over to a no-tethered polymer (except seed)
@@ -88,7 +90,18 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
 
   // using the same seed may be problematic in some cases.. probably not as its only for
   //  initialisation?
-  init_atoms_caret(xs,x0,xN,NoTeth.get_bondlength(),seed);
+
+
+  if (v_istr[20] == "caret") {
+    init_atoms_caret(xs,x1,xN,NoTeth.get_bondlength(),seed);
+  } else if (v_istr[20] == "equilibrium") {
+    
+    double Lp = NoTeth.get_bending()/NoTeth.get_temp();
+    init_atoms_equilibrium(xs,x1,xN,Lp,NoTeth.get_bondlength(),seed);
+  } else {
+    throw std::invalid_argument("need to specify type of initialisation"
+				" ('caret' or 'equilibrium') after setting seed.");
+  }
   
   Eigen::Matrix3Xd Fs(3,NoTeth.get_Nbeads());
 
@@ -96,60 +109,35 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
 
   NoTeth.setup(xs);
 
-  double t = 0;
+  int step = 0;
 
   int iterations;
 
-  Fs.setZero();
-  Fs.col(0) = -springK*(xs.col(0)-x0);
-  Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN);
-  
-  NoTeth.first_step(xs,Fs,dt);
-
-  Fs.setZero();
-  Fs.col(0) = -springK*(xs.col(0)-x0);
-  Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN);
-
-  iterations = NoTeth.second_step(xs,Fs,dt,itermax);
-
-  if (iterations > itermax)
-      throw std::runtime_error("Unable to initialise polymer (failure at time "
-			       + std::to_string(t)
-			       + std::string("). Consider reducing timestep (currently ")
-			       + std::to_string(dt)
-			       + std::string(") or maybe increasing itermax (currently ")
-			       + std::to_string(itermax) + std::string(")."));
-
-  t += dt;
-
-
   while ((xs.col(last_bead)-xN).norm() > tol
-	 || (xs.col(0)-x0).norm() > tol
-	 || t < nsteps*dt) {
-
+	 || (xs.col(0)-x1).norm() > tol
+	 || step < nsteps) {
 
     Fs.setZero();
-    Fs.col(0) = -springK*(xs.col(0)-x0);
+    Fs.col(0) = -springK*(xs.col(0)-x1);
     Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN);
     
     NoTeth.first_step(xs,Fs,dt);
     
     Fs.setZero();
-    Fs.col(0) = -springK*(xs.col(0)-x0);
+    Fs.col(0) = -springK*(xs.col(0)-x1);
     Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN);
     
     iterations = NoTeth.second_step(xs,Fs,dt,itermax);
     
     if (iterations > itermax)
-      throw std::runtime_error("Unable to initialise polymer (failure at time "
-			       + std::to_string(t)
+      throw std::runtime_error("Unable to initialise polymer (failure at step "
+			       + std::to_string(step)
 			       + std::string("). Consider reducing timestep (currently ")
 			       + std::to_string(dt)
 			       + std::string(") or maybe increasing itermax (currently ")
 			       + std::to_string(itermax) + std::string(")."));
     
-    
-    t += dt;
+    step ++;
 
 
   }
@@ -207,11 +195,11 @@ void gramschmidt(Eigen::Vector3d& x1,Eigen::Vector3d& ey,
 
 /* -------------------------------------------------------------------------- */
 /* Call to set the xs vector to a random configuration with centre of mass
-   given by (x0 + xN)/2, and the distance between points in xs is given by
+   given by (x1 + xN)/2, and the distance between points in xs is given by
    bondlength. */
 /* -------------------------------------------------------------------------- */
 void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd> xs,
-		     Eigen::Vector3d x0,Eigen::Vector3d xN,
+		     Eigen::Vector3d x1,Eigen::Vector3d xN,
 		     double bondlength, int seed)
 {
 
@@ -235,7 +223,7 @@ void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
   int Nbeads = xs.cols();
 
-  Eigen::Matrix3Xd bonds(3,Nbeads);
+  Eigen::Matrix3Xd bonds(3,Nbeads-1);
 
   for (int mu = 0; mu < Nbeads-1; mu++) {
 
@@ -277,7 +265,7 @@ void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd> xs,
   
   }
 
-  xs.col(0) = x0;
+  xs.col(0) = x1;
 ;
 
 
@@ -296,7 +284,7 @@ void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd> xs,
   com /= Nbeads;
 
   for (int i = 0; i < Nbeads; i++) {
-    xs.col(i) = xs.col(i) + (x0 + xN)/2 - com;
+    xs.col(i) = xs.col(i) + (x1 + xN)/2 - com;
   }  
     
   return;
@@ -305,31 +293,31 @@ void init_atoms_rand(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
 /* -------------------------------------------------------------------------- */
 /* Call to set line configuration so that polymer intersects points
-   x0 and xN with same centre of mass as the initial points.  */
+   x1 and xN with same centre of mass as the initial points.  */
 /* -------------------------------------------------------------------------- */
 void init_atoms_line(Eigen::Ref<Eigen::Matrix3Xd> xs,
-		     Eigen::Vector3d x0,Eigen::Vector3d xN,
+		     Eigen::Vector3d x1,Eigen::Vector3d xN,
 		     double bondlength)
 {
 
   
-  double length_init = (xN-x0).norm();
+  double length_init = (xN-x1).norm();
   int Nbeads = xs.cols();
   
   double t1 = 0.5*(1-(Nbeads-1)*bondlength/length_init);
   for (int i = 0; i < Nbeads; i++) 
-    xs.col(i) = x0 + (xN-x0)*(t1+i*bondlength/length_init);
+    xs.col(i) = x1 + (xN-x1)*(t1+i*bondlength/length_init);
     
   return;
 
 }
 /* -------------------------------------------------------------------------- */
 /* Call to set the xs vector to a caret (^) configuration with centre of mass
-   given by (x0 + xN)/2, and the distance between points in xs is given by
+   given by (x1 + xN)/2, and the distance between points in xs is given by
    bondlength. */
 /* -------------------------------------------------------------------------- */
 void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs,
-		      Eigen::Vector3d x0,Eigen::Vector3d xN,
+		      Eigen::Vector3d x1,Eigen::Vector3d xN,
 		      double bondlength,int seed)
 {
 
@@ -341,11 +329,6 @@ void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
   int Nbeads = xs.cols();
 
-  Eigen::Matrix3Xd bonds(3,Nbeads);
-
-
-  
-
   
   Eigen::Vector3d nhat;
 
@@ -353,15 +336,15 @@ void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs,
   nhat(1) = 2*dist(gen);
   nhat(2) = 2*dist(gen);
   
-  Eigen::Vector3d dd = xN-x0;
+  Eigen::Vector3d dd = xN-x1;
 
   if (dd.norm() > bondlength*(xs.cols()-1)) {
-    throw std::runtime_error("|x0-xN| is longer than the polymer.");
+    throw std::runtime_error("|x1-xN| is longer than the polymer.");
   }
 
 
   if (dd.norm() < SMALL) {
-    throw std::runtime_error("|x0-xN| is longer than the polymer.");
+    throw std::runtime_error("|x1-xN| = 0.");
   }
 
   if (std::abs(dd(2)) < SMALL) {
@@ -385,8 +368,8 @@ void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
 
   // since the parameterisation only works for an odd number of beads, we overshoot
-  // the point x0 for an even number of beads by pretending the system only has
-  // Nbeads-1 beads, so the final bead gets put past the point x0
+  // the point x1 for an even number of beads by pretending the system only has
+  // Nbeads-1 beads, so the final bead gets put past the point x1
   if (xs.cols() % 2 == 0) {
     fakelength = (xs.cols()-2)*bondlength;
   } else {
@@ -410,7 +393,7 @@ void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
     // integer division rounds toward zero
     if (i < xs.cols()/2) {
-      xs.col(i) = x0 + 2*alpha*tp;
+      xs.col(i) = x1 + 2*alpha*tp;
     } else {
       xs.col(i) = xN + 2*beta*(1-tp);
     }
@@ -418,6 +401,146 @@ void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> xs,
   return;
 
 }
+
+/* -------------------------------------------------------------------------- */
+/* Call to set the xs vector to a caret (^) configuration with centre of mass
+   given by (x1 + xN)/2, and the distance between points in xs is given by
+   bondlength. */
+/* -------------------------------------------------------------------------- */
+void init_atoms_equilibrium(Eigen::Ref<Eigen::Matrix3Xd> xs,
+			    Eigen::Vector3d x1,Eigen::Vector3d xN,
+			    double Lp, double bondlength,int seed)
+{
+
+  std::mt19937 gen;
+
+  std::uniform_real_distribution<double> dist;
+
+  gen.seed(seed);
+
+  int Nbeads = xs.cols();
+
+  Eigen::Matrix3Xd bonds(3,Nbeads-1);
+
+  double L = (Nbeads-1)*bondlength;
+
+
+
+  // create first bond randomly
+  bonds(0,0) = dist(gen)-0.5;
+  bonds(1,0) = dist(gen)-0.5;
+  bonds(2,0) = dist(gen)-0.5;
+
+  bonds /= bonds.norm();
+  
+  Eigen::Vector3d dd = xN-x1;
+
+  if (dd.norm() > L) {
+    throw std::runtime_error("|x1-xN| is longer than the polymer.");
+  }
+
+
+  if (dd.norm() < SMALL) {
+    throw std::runtime_error("|x1-xN| = 0.");
+  }
+
+
+  double fakelength;
+
+
+  xs.col(0) = x1;
+  xs.col(1) = x1 + bonds.col(0)*bondlength;
+
+
+  double rn;
+  double costheta;
+  Eigen::Vector3d sdum;
+  double bnorm;
+
+  double lam = Lp/bondlength;
+  
+  for (int mu = 2; mu < Nbeads; mu ++ ) {
+    rn = dist(gen);
+
+    costheta = 1.0/lam*log(rn*(exp(lam)-exp(-lam))+exp(-lam));
+    bnorm = sqrt(1-costheta*costheta);
+
+    sdum(0) = dist(gen)-0.5;
+    sdum(1) = dist(gen)-0.5;
+    sdum(2) = dist(gen)-0.5;
+
+    sdum = sdum-bonds.col(mu-2).dot(sdum)*bonds.col(mu-2);
+    sdum /= sdum.norm();
+
+    bonds.col(mu-1) = bonds.col(mu-2)*costheta + bnorm*sdum;
+
+    xs.col(mu) = xs.col(mu-1) + bonds.col(mu-1)*bondlength;
+
+  }
+
+
+
+  // xs now is a polymer of equilibrium configuration. However, we would like to
+  // also introduce a shift so that the polymer has centre of mass (COM) equal to
+  // (x1 + xN)/2, and that the vector connecting the first and last beads of the
+  // polymer points along the vector xN-x1.
+
+  // to do this, we first must shift the system so that the first and last beads
+  // (NOT the polymer as a whole) have the same centre of mass as the (x1+xN)/2
+  
+  Eigen::Vector3d com = (x1+xN)/2; // centre of mass to be calculated
+
+
+  Eigen::Vector3d tmp_com = (xs.col(0)+xs.col(Nbeads-1))/2;
+    
+  // set at tmp com
+  for (int i = 0; i < Nbeads; i++) {
+    xs.col(i) = xs.col(i) + com - tmp_com;
+  }
+
+
+  
+  /* now rotate so that  xs.col(Nbeads-1)-xs.col(0) is along the line xN-x1. */
+
+  Eigen::Vector3d Lhat = xs.col(Nbeads-1)-com;
+  Lhat /= Lhat.norm();
+  
+  Eigen::Vector3d Xhat = xN-com;
+  Xhat /= Xhat.norm();
+
+
+  // get the angle phi between Xhat and Lhat
+
+  double cosphi = Xhat.dot(Lhat);
+
+  double sinphi = (Xhat.cross(Lhat)).norm();
+
+  std::cout << cosphi << std::endl;
+  std::cout << sinphi << std::endl;
+  
+  // and the unit vector between them
+  Eigen::Vector3d nhat = Xhat.cross(Lhat)/sinphi;
+
+  std::cout << nhat << std::endl;
+
+
+  Eigen::Vector3d Lrot;
+
+  for (int i = 0; i < Nbeads; i++) {
+    
+    Lrot = xs.col(i)-com;
+    
+    // rodrigues formula of rotation about nhat
+    Lrot = Lrot*cosphi - nhat.cross(Lrot)*sinphi + nhat*nhat.dot(Lrot)*(1-cosphi);
+    
+    xs.col(i) = Lrot + com;
+    
+  };
+
+  return;
+
+}
+
 
 
   

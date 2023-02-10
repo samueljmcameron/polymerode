@@ -23,6 +23,9 @@ void init_atoms_line(Eigen::Ref<Eigen::Matrix3Xd>,Eigen::Vector3d ,Eigen::Vector
 void init_atoms_caret(Eigen::Ref<Eigen::Matrix3Xd> , Eigen::Vector3d ,Eigen::Vector3d ,
 		      double,int);
 
+void init_atoms_equilibrium(Eigen::Ref<Eigen::Matrix3Xd> ,
+			    Eigen::Vector3d ,Eigen::Vector3d ,
+			    double, double ,int );
 
   
 }
