@@ -1,8 +1,31 @@
 #include "run.hpp"
 #include "iovtk.hpp"
+#include <fstream>
+
+
+void bin_costhetas(Eigen::Ref<Eigen::MatrixXd> hist,BeadRodPmer::Polymer &pmer)
+{
+
+  double spacing = 2.0/hist.cols();
+
+  int ibin;
+
+  for (int mu = 0; mu < hist.rows(); mu++) {
+
+    ibin = static_cast<int> ((pmer.bonds.col(mu+1).dot(pmer.bonds.col(mu))+1)/spacing);
+    if (ibin == hist.cols()) ibin -= 1;
+
+    hist(mu,ibin) += 1.0;
+
+  }
+
+    
+}
+
 
 void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
-	 int nsteps,double dt, std::string dump_name, int dump_every)
+	 int nsteps,double dt, std::string dump_name, int dump_every,
+	 bool histogram,int nbins, int bin_every)
 {
 
   Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads());
@@ -23,11 +46,17 @@ void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
   BeadRodPmer::ioVTK::writeVTKPolyData(fname,xs);
   BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
 
+  
 
   pmer.setup(xs);
 
-  int iterations;
 
+  Eigen::MatrixXd hist(pmer.get_Nbeads()-2,nbins);
+  hist.setZero();
+
+  
+  int iterations;
+  int ibin;
   // time-step
   for (int i = 1; i <= nsteps; i++) {
 
@@ -38,6 +67,7 @@ void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
     iterations = pmer.second_step(xs,Fs,dt,itermax);
     t += dt;
 
+    
     
     if (iterations >= itermax) {
       
@@ -65,9 +95,23 @@ void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
       BeadRodPmer::ioVTK::writeVTKcollectionMiddle(collection_name,fname,t);
       
     }
+
+    if (histogram && i % bin_every == 0) {
+      bin_costhetas(hist,pmer);
+    }
+
+
+    
   }
 
-
+  if (histogram) {
+    std::string histName = dump_name + std::string(".hist");
+    std::ofstream histFile(histName);
+    if (histFile.is_open()) {
+      histFile << hist;
+    }
+  }
+  
   BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
 

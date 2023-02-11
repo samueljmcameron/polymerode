@@ -47,6 +47,7 @@ class Polymer {
 
   
   Eigen::VectorXd constraint_errors;
+  Eigen::Matrix3Xd bonds;
   
 protected:
   int Nbeads;           // number of polymer beads
@@ -71,7 +72,6 @@ protected:
   Eigen::Matrix3Xd noises,unprojected_noises;
   Eigen::Matrix3Xd tangents;
 
-  Eigen::Matrix3Xd bonds;
   
   std::vector<Eigen::Matrix3d> frictions;
 

@@ -431,7 +431,7 @@ void init_atoms_equilibrium(Eigen::Ref<Eigen::Matrix3Xd> xs,
   bonds(1,0) = dist(gen)-0.5;
   bonds(2,0) = dist(gen)-0.5;
 
-  bonds /= bonds.norm();
+  bonds.col(0) /= bonds.col(0).norm();
   
   Eigen::Vector3d dd = xN-x1;
 
@@ -515,14 +515,9 @@ void init_atoms_equilibrium(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
   double sinphi = (Xhat.cross(Lhat)).norm();
 
-  std::cout << cosphi << std::endl;
-  std::cout << sinphi << std::endl;
   
   // and the unit vector between them
   Eigen::Vector3d nhat = Xhat.cross(Lhat)/sinphi;
-
-  std::cout << nhat << std::endl;
-
 
   Eigen::Vector3d Lrot;
 

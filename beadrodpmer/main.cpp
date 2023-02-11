@@ -176,25 +176,44 @@ int main(int argc, char* argv[])
     
     v_line = input::split_line(line);
 
-    if (v_line.size() != 2) {
-      std::cerr << " Invalid argument in input file" << std::endl;
-      return EXIT_FAILURE;
-    }
 
     if (v_line[0] == "run") {
-      int numsteps = std::stoi(v_line[1]);
-      std::cout << "Running simulation of " << polymertype << " polymer." << std::endl;
+      std::cout << "reading run" << std::endl;
+      if (v_line.size() == 2) {
+	int numsteps = std::stoi(v_line[1]);
+	std::cout << "Running simulation of " << polymertype << " polymer." << std::endl;
+	
+	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+	
+	run(*pmer,xs,numsteps,dt,dump_fname,dump_every);
 
-      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	std::cout << "Run time = "
+		  << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
+		  << "seconds." << std::endl;  
+      } else if (v_line.size() == 4) {
+	int numsteps = std::stoi(v_line[1]);
+	int nbins = std::stoi(v_line[2]);
+	int bin_every = std::stoi(v_line[3]);
+	std::cout << "Running simulation of " << polymertype
+		  << " polymer while also binning probability distribution of cosines."
+		  << std::endl;
+	
+	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+	
+	run(*pmer,xs,numsteps,dt,dump_fname,dump_every,true,nbins,bin_every);
 
-      run(*pmer,xs,std::stoi(v_line[1]),dt,dump_fname,dump_every);
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	std::cout << "Run time = "
+		  << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
+		  << "seconds." << std::endl;  
 
-      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-      std::cout << "Run time = "
-		<< std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1e6
-		<< "seconds." << std::endl;  
+      } else {
+	std::cerr << " Invalid argument in input file" << std::endl;
+	return EXIT_FAILURE;
+      }
 
-      
+	
     } else {
       std::cerr << " Invalid argument in input file" << std::endl;
     }
