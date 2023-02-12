@@ -233,7 +233,6 @@ void SingleTether::set_bdets_and_tdets()
 {
   int offset = 3;
 
-
   bDets(Nbeads-1+offset) = 1.0;
   bDets(Nbeads-2+offset) = 2 - bonds.col(Nbeads-2).squaredNorm();
   tDets(0) = 1.0;
@@ -260,7 +259,7 @@ void SingleTether::compute_effective_kappa()
   end_inverses({0,1,2}) = bonds.col(0)*bDets(1+offset)/(gDet*bondlength);
 
   for (int i = 0; i < Nbeads-2; i++) {
-    k_effs(i) = (kappa - temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2+offset)/gDet
+    k_effs(i) = (kappa + temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2+offset)/gDet
 		 )/(bondlength*bondlength);
   }
 

@@ -227,7 +227,7 @@ void DoubleTether::compute_effective_kappa()
   end_inverses({3,4,5}) = -bonds.col(Nbeads-2)*tDets(Nbeads-2)/(gDet*bondlength);
 
   for (int i = 0; i < Nbeads-2; i++) {
-    k_effs(i) = (kappa - temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2+offset)/gDet
+    k_effs(i) = (kappa + temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2+offset)/gDet
 		 )/(bondlength*bondlength);
   }
 

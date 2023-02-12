@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cmath>
 #include <stdexcept>
-
+#include <Eigen/Dense>
 
 namespace BeadRodPmer {
 
@@ -798,13 +798,51 @@ void NoTether::compute_effective_kappa()
 
   set_bdets_and_tdets(0);
 
+  /*
+  Eigen::MatrixXd Gtmp(Nbeads-1,Nbeads-1);
+
+  Gtmp.setZero();
+
+  int i = 0;
+
+  Gtmp(i,i) = 2.0;
+  Gtmp(i,i+1) = -costhetas(i);
+
+  for (i = 1; i < Nbeads-2; i++) {
+    Gtmp(i,i) = 2.0;
+    Gtmp(i,i-1) = -costhetas(i-1);
+    Gtmp(i,i+1) = -costhetas(i);
+  }
+
+  Gtmp(i,i) = 2.0;
+  Gtmp(i,i-1) = -costhetas(i-1);
+
+  std::cout << " Ginv = " << std::endl;
+
+  Gtmp = Gtmp.inverse();
+  */
   double gDet = tDets(Nbeads-1);
+
+
+  /*
+  for (int i = 1; i < Nbeads-1; i++) {
+    std::cout << "correct Ginv(i,i-1) = " << Gtmp(i,i-1) << ", "
+	      << "incorrect Ginve(i,i-1) = " << costhetas(i-1)*tDets(i-1)*bDets(i+1)/gDet
+	      << std::endl;
+  }
+  */
   
+
+
   for (int i = 0; i < Nbeads-2; i++) {
 
-    k_effs(i) = (kappa - temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2)/gDet
+    k_effs(i) = (kappa + temp*bondlength*costhetas(i)*tDets(i)*bDets(i+2)/gDet
 		 )/(bondlength*bondlength);
+    //    k_effs(i) = kappa/(bondlength*bondlength);
+
+    
   }
+
 
 
   
