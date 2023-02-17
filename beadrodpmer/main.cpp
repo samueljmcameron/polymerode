@@ -7,7 +7,7 @@
 #include "single_tether.hpp"
 #include "double_tether.hpp"
 #include "initialise.hpp"
-
+#include "iovtk.hpp"
 
 #include "run.hpp"
 
@@ -119,16 +119,21 @@ int main(int argc, char* argv[])
     
     v_line = input::split_line(line);
 
-    if (v_line[0] != "initialise") {
+    if (v_line[0] == "initialise" ) {
+      v_line.erase(v_line.begin());
+
+      // initialise the xs vector (doing some unnecessary but illustrative slicing)
+      BeadRodPmer::Initialise::init_atoms_relaxed_caret(v_line,*pmer,
+							xs.middleCols(0,pmer->get_Nbeads()));
+
+      
+    } else if (v_line[0] == "read") {
+      BeadRodPmer::ioVTK::readVTKPolyData(xs,v_line.at(1));
+
+    } else  {
       std::cerr << " Invalid argument in input file" << std::endl;
       return EXIT_FAILURE;
     }
-
-    v_line.erase(v_line.begin());
-
-    // initialise the xs vector (doing some unnecessary but illustrative slicing)
-    BeadRodPmer::Initialise::init_atoms_relaxed_caret(v_line,*pmer,
-						      xs.middleCols(0,pmer->get_Nbeads()));
 
     break;
   }

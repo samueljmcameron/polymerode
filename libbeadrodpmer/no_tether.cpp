@@ -117,7 +117,6 @@ void NoTether::first_step(Eigen::Ref<Eigen::Matrix3Xd> xs,
   
   compute_tension(Fs);
   initial_integrate(xs,Fs,dt,0,NONE);
-
 }
 
 
@@ -972,7 +971,7 @@ int NoTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
   final_integrate(xs,Fs,Delta_t,0,NONE);
   calculate_constraint_errors(0,xs);
   update_dCdlambda(Delta_t,0);
-
+  
   
   //and then solve
 
@@ -991,7 +990,8 @@ int NoTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
   int count = 0;
 
-  while (negative_tension_change.norm() > tolerance && count <= itermax) {
+
+  while (negative_tension_change.norm()/tension.norm() > tolerance && count <= itermax) {
 
 
 
@@ -999,7 +999,6 @@ int NoTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
     calculate_constraint_errors(0,xs);
     update_dCdlambda(Delta_t,0);
 
-  
     jacob_solver->factorize(dCdlambda);
 
 

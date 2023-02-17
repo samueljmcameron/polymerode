@@ -3,7 +3,6 @@
 #include <exception>
 #include <Eigen/Dense>
 #include "no_tether.hpp"
-#include <iostream>
 
 #include "initialise.hpp"
 
@@ -29,10 +28,11 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
   double springK,dt,tol;
   int seed;
   int nsteps,itermax;
+  double delay;
 
 
   // read in input from istr
-  if (v_istr.size() != 21)
+  if (v_istr.size() != 23)
     throw std::invalid_argument("incorrect number of arguments for polymer initialisation.");
   
   if (v_istr[0] != "x1")
@@ -73,6 +73,9 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
     throw std::invalid_argument("missing tol argument for polymer initialisation.");
   seed = std::stoi(v_istr[19]);
 
+  if (v_istr[20] != "delay")
+    throw std::invalid_argument("missing tol argument for polymer initialisation.");
+  delay = std::stod(v_istr[21]);
   
   
   // transfer arguments over to a no-tethered polymer (except seed)
@@ -92,9 +95,9 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
   //  initialisation?
 
 
-  if (v_istr[20] == "caret") {
+  if (v_istr[22] == "caret") {
     init_atoms_caret(xs,x1,xN,NoTeth.get_bondlength(),seed);
-  } else if (v_istr[20] == "equilibrium") {
+  } else if (v_istr[22] == "equilibrium") {
     
     double Lp = NoTeth.get_bending()/NoTeth.get_temp();
     init_atoms_equilibrium(xs,x1,xN,Lp,NoTeth.get_bondlength(),seed);
@@ -113,30 +116,52 @@ void init_atoms_relaxed_caret(const std::vector<std::string> &v_istr, const Poly
 
   int iterations;
 
+
+  Eigen::Vector3d x1_t,xN_t, dx1,dxN;
+  Eigen::Vector3d s1,sN;
+
+  s1 = xs.col(0);
+  sN = xs.col(last_bead);
+  x1_t = s1;
+  xN_t = sN;
+
+  dx1 = x1-s1;
+  dxN = xN-sN;
+
+  
   while ((xs.col(last_bead)-xN).norm() > tol
 	 || (xs.col(0)-x1).norm() > tol
 	 || step < nsteps) {
 
+    
     Fs.setZero();
-    Fs.col(0) = -springK*(xs.col(0)-x1);
-    Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN);
+    Fs.col(0) = -springK*(xs.col(0)-x1_t);
+    Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN_t);
+
+      x1_t = s1 + (1-exp(-step*dt/delay))*dx1;
+      xN_t = sN + (1-exp(-step*dt/delay))*dxN;
+
+
     
     NoTeth.first_step(xs,Fs,dt);
     
     Fs.setZero();
-    Fs.col(0) = -springK*(xs.col(0)-x1);
-    Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN);
+    Fs.col(0) = -springK*(xs.col(0)-x1_t);
+    Fs.col(last_bead) = -springK*(xs.col(last_bead)-xN_t);
     
     iterations = NoTeth.second_step(xs,Fs,dt,itermax);
     
-    if (iterations > itermax)
+    if (iterations > itermax) {
+
+
+      
       throw std::runtime_error("Unable to initialise polymer (failure at step "
 			       + std::to_string(step)
 			       + std::string("). Consider reducing timestep (currently ")
 			       + std::to_string(dt)
 			       + std::string(") or maybe increasing itermax (currently ")
 			       + std::to_string(itermax) + std::string(")."));
-    
+    }
     step ++;
 
 

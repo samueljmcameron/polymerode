@@ -588,7 +588,7 @@ int SingleTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
   int count = 0;
 
 
-  while (negative_tension_change.norm() > tolerance && count <= itermax) {
+  while (negative_tension_change.norm()/tension.norm() > tolerance && count <= itermax) {
 
     final_integrate(xs,Fs,Delta_t,3,SINGLE);
     calculate_constraint_errors(X_of_t_at_1,xs);

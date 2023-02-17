@@ -523,7 +523,7 @@ int DoubleTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
   tension = tension - negative_tension_change;
   int count = 0;
 
-  while (negative_tension_change.norm() > tolerance && count <= itermax) {
+  while (negative_tension_change.norm()/tension.norm() > tolerance && count <= itermax) {
 
 
 

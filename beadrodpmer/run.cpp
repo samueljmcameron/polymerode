@@ -1,7 +1,7 @@
 #include "run.hpp"
 #include "iovtk.hpp"
 #include <fstream>
-
+#include <iostream>
 
 void bin_costhetas(Eigen::Ref<Eigen::MatrixXd> hist,BeadRodPmer::Polymer &pmer)
 {
@@ -31,8 +31,10 @@ void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
   Eigen::Matrix3Xd Fs(3,pmer.get_Nbeads());
 
   int Nbeads = pmer.get_Nbeads();
-  
 
+  std::vector<double> end2end_vec;
+
+  
   int itermax = 50;
   double t = 0;
 
@@ -100,7 +102,9 @@ void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
       bin_costhetas(hist,pmer);
     }
 
-
+    if (i % bin_every == 0) {
+      end2end_vec.push_back((xs.col(Nbeads-1)-xs.col(0)).squaredNorm());
+    }
     
   }
 
@@ -109,8 +113,33 @@ void run(BeadRodPmer::Polymer & pmer,Eigen::Ref<Eigen::Matrix3Xd> xs,
     std::ofstream histFile(histName);
     if (histFile.is_open()) {
       histFile << hist;
+    } else {
+      std::cerr << "could not open histogram file." << std::endl;
     }
   }
+
+  std::string end2endName = dump_name + std::string(".end2end");
+  std::ofstream end2endFile(end2endName);
+  if (end2endFile.is_open()) {
+    double end2end_variance = 0.0;
+    double end2end_average = 0.0;
+    for (auto val : end2end_vec)
+      end2end_average += val;
+
+    end2end_average /= end2end_vec.size();
+
+    for (auto val : end2end_vec)
+      end2end_variance += (val-end2end_average)*(val-end2end_average);
+
+    end2end_variance /= (end2end_vec.size()-1);
+
+    end2endFile << "# average variance number-of-samples" << std::endl
+		<< end2end_average << " " << end2end_variance << " "
+		<< end2end_vec.size() << std::endl;
+  } else {
+    std::cerr << "could not open end-to-end file." << std::endl;
+  }
+  
   
   BeadRodPmer::ioVTK::writeVTKcollectionFooter(collection_name);
 
