@@ -3,7 +3,7 @@
 double_tether beads 100 bondlength 2.0 zeta_para 0.5 zeta_perp 1.0 bending 206.0 temp 4.114 seed 3489120
 
 # old seed was 712049
-initialise x1 -35.0 -35.0 -35.0 xN 35.0 35.0 35.0 springK 100 dt 1e-3 nsteps 100000 tol 0.1 itermax 20 seed ${seed} equilibrium
+initialise x1 -35.0 -35.0 -35.0 xN 35.0 35.0 35.0 springK 100 dt 1e-3 nsteps 100000 tol 0.1 itermax 20 seed ${seed} delay 1000.0 equilibrium
 
 
 timestep     1e-3
