@@ -1,11 +1,15 @@
 import numpy as np
 
-def convertVTKtoNParrays(fname):
+def convertVTKtoNParrays(fname,dname=None):
 
     with open(fname) as vtkfile:
         while True:
             line = vtkfile.readline()
-            if line.rstrip() == "<DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">":
+            if dname == None:
+                matchline = "<DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">"
+            else:
+                matchline = f"<DataArray Name=\"{dname}\" type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">"
+            if line.rstrip() == matchline:
                 line = vtkfile.readline().rstrip()
                 break
             elif (line == ""):
