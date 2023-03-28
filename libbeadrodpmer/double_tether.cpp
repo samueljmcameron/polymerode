@@ -523,9 +523,8 @@ int DoubleTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
   tension = tension - negative_tension_change;
   int count = 0;
 
-  while (negative_tension_change.norm()/tension.norm() > tolerance && count <= itermax) {
-
-
+  while ( count <= itermax && constraint_errors.norm()/(bondlength*Nbeads) > tolerance 
+	  && negative_tension_change.norm()/tension.norm() > tolerance ) {
 
     final_integrate(xs,Fs,Delta_t,3,DOUBLE);
     calculate_constraint_errors(X_of_t_at_1,X_of_t_at_N,xs);

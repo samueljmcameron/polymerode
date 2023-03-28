@@ -990,9 +990,8 @@ int NoTether::correct_tension(Eigen::Ref<Eigen::Matrix3Xd> xs,
 
   int count = 0;
 
-
-  while (negative_tension_change.norm()/tension.norm() > tolerance && count <= itermax) {
-
+  while ( count <= itermax && constraint_errors.norm()/(bondlength*Nbeads) > tolerance 
+	  && negative_tension_change.norm()/tension.norm() > tolerance ) {
 
 
     final_integrate(xs,Fs,Delta_t,0,NONE);
