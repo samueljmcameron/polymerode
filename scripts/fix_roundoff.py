@@ -2,16 +2,16 @@ import numpy as np
 from scipy.optimize import root,show_options
 
 
-def constraints(epsilons,uxs,uys,uzs):
+def constraints(epsilons,uxs,uys,uzs,bondlength):
 
     N = uxs.size
 
     b2s = uxs**2+uys**2+uzs**2
 
-    return [np.sqrt(b2s)*np.sqrt(1+epsilons)-4.0,np.diag(np.sqrt(b2s)/np.sqrt(1+epsilons))]
+    return [np.sqrt(b2s)*np.sqrt(1+epsilons)-bondlength,np.diag(np.sqrt(b2s)/np.sqrt(1+epsilons))]
 
 
-def fix_roundoff(xs,ys,zs):
+def fix_roundoff(xs,ys,zs,bondlength=4.0):
 
     uxs = xs[1:]-xs[:-1]
     uys = ys[1:]-ys[:-1]
@@ -19,7 +19,7 @@ def fix_roundoff(xs,ys,zs):
 
     epsilons = uxs*0
 
-    sol = root(constraints,epsilons,args=(uxs,uys,uzs),jac=True)
+    sol = root(constraints,epsilons,args=(uxs,uys,uzs,bondlength),jac=True)
 
     
     uxs *= np.sqrt(1+sol.x)
