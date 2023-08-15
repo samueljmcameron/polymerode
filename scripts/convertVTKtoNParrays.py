@@ -1,6 +1,6 @@
 import numpy as np
 
-def convertVTKtoNParrays(fname,dname=None):
+def convertVTKtoNParrays(fname,dname=None,dtype='Float64',ncmps=3):
 
     with open(fname) as vtkfile:
         while True:
@@ -8,7 +8,7 @@ def convertVTKtoNParrays(fname,dname=None):
             if dname == None:
                 matchline = "<DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">"
             else:
-                matchline = f"<DataArray Name=\"{dname}\" type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">"
+                matchline = f"<DataArray Name=\"{dname}\" type=\"{dtype}\" NumberOfComponents=\"{ncmps}\" format=\"ascii\">"
             if line.rstrip() == matchline:
                 line = vtkfile.readline().rstrip()
                 break
@@ -20,30 +20,31 @@ def convertVTKtoNParrays(fname,dname=None):
 
     words = line.split()
 
-    Nbeads = len(words)//3
+    Nbeads = len(words)//ncmps
 
-    xs = np.empty([Nbeads],float)
-    ys = np.empty([Nbeads],float)
-    zs = np.empty([Nbeads],float)
+    outs = []
+
+
+        
+
+    for i in range(ncmps):
+        if dtype == 'Float64':
+            outs.append(np.empty([Nbeads],float))
+        else:
+            outs.append(np.empty([Nbeads],int))
 
     bead = 0
     wi = 0
 
-    com_calc = np.array([0,0,0],float)
+
     while (bead < Nbeads):
 
 
-        xs[bead] = words[wi]
-        ys[bead] = words[wi+1]
-        zs[bead] = words[wi+2]
+        for i in range(ncmps):
+            outs[i][bead] = words[wi]
+            wi += 1
 
-        com_calc[0] += xs[bead]
-        com_calc[1] += ys[bead]
-        com_calc[2] += zs[bead]
 
         bead += 1
-        wi += 3
 
-
-
-    return [xs,ys,zs]
+    return outs
