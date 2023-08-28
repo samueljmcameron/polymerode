@@ -26,7 +26,7 @@ def semi_circle(R,a,N):
 
     xs = np.empty([N],float)
     ys = np.empty([N],float)
-    zs = np.empty([N],float)*0
+    zs = np.zeros([N],float)
 
 
     for i in range(N):
