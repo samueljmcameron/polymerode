@@ -2,12 +2,12 @@ import numpy as np
 
 
 
-def keyLikeShape(bondlength,N,rotate=True):
+def keyLikeShape(bondlength,N,rotate=True,circlebeads=4):
 
     if (N % 2 == 0):
-        beadsincircle=8
+        beadsincircle=2*circlebeads
     else:
-        beadsincircle=7
+        beadsincircle=2*circlebeads-1
 
 
     phi = 2*np.pi/(beadsincircle+1)
